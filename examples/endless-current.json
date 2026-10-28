@@ -1,0 +1,32 @@
+{
+  "name": "current-endless-20-unit",
+  "stageId": 9101,
+  "team": [
+    { "id": "c2", "level": 40 },
+    { "id": "s4", "level": 17 },
+    { "id": "s1", "level": 10 },
+    { "id": "s2", "level": 9 },
+    { "id": "c3", "level": 30 },
+    { "id": "b5", "level": 28 },
+    { "id": "c6", "level": 14 },
+    { "id": "c1", "level": 17 }
+  ],
+  "items": [],
+  "policy": {
+    "walletTarget": 8,
+    "economyFirst": true,
+    "openers": ["c2"],
+    "targetCounts": {
+      "s4": 7,
+      "s1": 6,
+      "s2": 3,
+      "c3": 2,
+      "b5": 1,
+      "c2": 1
+    },
+    "priority": ["s4", "s1", "s2", "c3", "b5", "c2"],
+    "fallbackAfter": 775,
+    "fallbackPriority": ["c6", "c2", "c1"]
+  },
+  "maxTime": 900
+}

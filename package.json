@@ -1,0 +1,18 @@
+{
+  "name": "ilovecat-battle-sim",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Offline backend battle simulator for the Bootcat 喵喵的逆袭 game",
+  "bin": {
+    "ilovecat-battle-sim": "./src/cli.mjs"
+  },
+  "scripts": {
+    "test": "node --test",
+    "simulate": "node src/cli.mjs",
+    "capture": "python3 tools/capture_live.py"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

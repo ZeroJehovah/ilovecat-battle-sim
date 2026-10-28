@@ -1,0 +1,4147 @@
+{
+  "capturedAt": "2026-10-28T08:57:42.438566+00:00",
+  "catalog": {
+    "cats": [
+      {
+        "ability": "none",
+        "ability_text": "最基本的前線戰力，便宜又出得快。",
+        "ability_value": 0,
+        "atk": 12,
+        "cooldown": 2.5,
+        "cost": 50,
+        "hp": 150,
+        "id": "c1",
+        "interval": 1,
+        "knockbacks": 2,
+        "look": {
+          "accent": "#f3c7c7",
+          "accessory": "none",
+          "fur": "#f7f4ee",
+          "pattern": "plain",
+          "size": 1
+        },
+        "name": "白糰子",
+        "origin": "第一批加入靴貓軍團的志願兵，負責站在最前面喊「喵！」",
+        "range": 40,
+        "speed": 45,
+        "story": "毛色雪白、圓得像一顆糰子。據說牠每天早上都會在玄關等主人出門，然後默默把拖鞋叼回原位。",
+        "tier": "C"
+      },
+      {
+        "ability": "none",
+        "ability_text": "血量很厚的肉牆，負責擋住老鼠。",
+        "ability_value": 0,
+        "atk": 6,
+        "cooldown": 4,
+        "cost": 100,
+        "hp": 520,
+        "id": "c2",
+        "interval": 1.2,
+        "knockbacks": 3,
+        "look": {
+          "accent": "#fbe3c4",
+          "accessory": "scarf",
+          "fur": "#f2a65a",
+          "pattern": "stripes",
+          "size": 1.15
+        },
+        "name": "阿橘",
+        "origin": "原本是社區便利商店的店貓，被罐罐的香味吸引入伍。",
+        "range": 35,
+        "speed": 32,
+        "story": "十隻橘貓九隻胖，剩下一隻特別胖。阿橘把吃下去的每一口飯都變成了防禦力。",
+        "tier": "C"
+      },
+      {
+        "ability": "none",
+        "ability_text": "跑得飛快、出手也快，適合搶先突破。",
+        "ability_value": 0,
+        "atk": 28,
+        "cooldown": 3.5,
+        "cost": 120,
+        "hp": 140,
+        "id": "c3",
+        "interval": 0.7,
+        "knockbacks": 1,
+        "look": {
+          "accent": "#4a4a55",
+          "accessory": "goggles",
+          "fur": "#2b2b33",
+          "pattern": "plain",
+          "size": 0.95
+        },
+        "name": "黑豆",
+        "origin": "在夜市被大家誤認為一團會動的黑布，後來才發現是隻熱血的貓。",
+        "range": 45,
+        "speed": 70,
+        "story": "半夜在走廊衝刺的黑影就是牠。黑豆從不走路，牠只用跑的。",
+        "tier": "C"
+      },
+      {
+        "ability": "area",
+        "ability_text": "範圍攻擊：一爪掃到面前的所有老鼠。",
+        "ability_value": 0,
+        "atk": 22,
+        "cooldown": 6,
+        "cost": 180,
+        "hp": 260,
+        "id": "c4",
+        "interval": 1.4,
+        "knockbacks": 2,
+        "look": {
+          "accent": "#e98b3a",
+          "accessory": "bow",
+          "fur": "#fffaf0",
+          "pattern": "calico",
+          "size": 1
+        },
+        "name": "三花妹",
+        "origin": "從市場的魚攤旁邊長大，練就了一次搶三條魚的本事。",
+        "range": 60,
+        "speed": 40,
+        "story": "三種顏色、三種個性，生氣起來會轉圈圈亂抓，誰靠近誰倒楣。",
+        "tier": "C"
+      },
+      {
+        "ability": "ranged",
+        "ability_text": "遠程攻擊：丟毛線球打中後方的老鼠。",
+        "ability_value": 0,
+        "atk": 26,
+        "cooldown": 5,
+        "cost": 160,
+        "hp": 180,
+        "id": "c5",
+        "interval": 1.6,
+        "knockbacks": 2,
+        "look": {
+          "accent": "#d7dbe0",
+          "accessory": "none",
+          "fur": "#9aa0a8",
+          "pattern": "plain",
+          "size": 1
+        },
+        "name": "灰灰",
+        "origin": "奶奶家的毛線籃，現在是軍團的彈藥庫。",
+        "range": 120,
+        "speed": 38,
+        "story": "灰灰小時候把奶奶的毛線全部纏成了一顆顆球，長大後發現它們是最好的武器。",
+        "tier": "C"
+      },
+      {
+        "ability": "none",
+        "ability_text": "超便宜的小貓，可以大量派出拖住敵人。",
+        "ability_value": 0,
+        "atk": 7,
+        "cooldown": 1.5,
+        "cost": 30,
+        "hp": 80,
+        "id": "c6",
+        "interval": 0.8,
+        "knockbacks": 1,
+        "look": {
+          "accent": "#fff3d6",
+          "accessory": "none",
+          "fur": "#f6dfb0",
+          "pattern": "plain",
+          "size": 0.8
+        },
+        "name": "奶油",
+        "origin": "一窩七隻的老么，跟著哥哥姊姊一起報名。",
+        "range": 35,
+        "speed": 55,
+        "story": "奶油色的小奶貓，打架不太行，但數量多的時候老鼠也會怕。",
+        "tier": "C"
+      },
+      {
+        "ability": "none",
+        "ability_text": "重拳出擊：出手慢，但每一下都很痛。",
+        "ability_value": 0,
+        "atk": 90,
+        "cooldown": 8,
+        "cost": 220,
+        "hp": 380,
+        "id": "c7",
+        "interval": 2.2,
+        "knockbacks": 2,
+        "look": {
+          "accent": "#5c4128",
+          "accessory": "none",
+          "fur": "#b98b54",
+          "pattern": "stripes",
+          "size": 1.1
+        },
+        "name": "虎斑",
+        "origin": "山上寺廟的看門貓，練了十年的貓拳。",
+        "range": 50,
+        "speed": 30,
+        "story": "身上的條紋據說是跟老虎學功夫時留下的。牠很少出手，一出手就是全力。",
+        "tier": "C"
+      },
+      {
+        "ability": "knockback",
+        "ability_text": "25% 機率把老鼠擊退。",
+        "ability_value": 0.25,
+        "atk": 20,
+        "cooldown": 5,
+        "cost": 150,
+        "hp": 220,
+        "id": "c8",
+        "interval": 1,
+        "knockbacks": 2,
+        "look": {
+          "accent": "#f7f7f7",
+          "accessory": "bow",
+          "fur": "#23232b",
+          "pattern": "tux",
+          "size": 1
+        },
+        "name": "賓士",
+        "origin": "原本在高級餐廳當接待，因為踹飛一隻偷吃的老鼠而被延攬。",
+        "range": 45,
+        "speed": 50,
+        "story": "永遠穿著黑西裝白襯衫，是軍團裡最有禮貌的打手：先鞠躬，再踹飛。",
+        "tier": "C"
+      },
+      {
+        "ability": "crit",
+        "ability_text": "25% 機率爆擊，造成 2.5 倍傷害。",
+        "ability_value": 0.25,
+        "atk": 55,
+        "cooldown": 9,
+        "cost": 300,
+        "hp": 420,
+        "id": "b1",
+        "interval": 1,
+        "knockbacks": 2,
+        "look": {
+          "accent": "#4b3a2f",
+          "accessory": "sword",
+          "fur": "#f1e6d2",
+          "pattern": "point",
+          "size": 1
+        },
+        "name": "暹羅劍士",
+        "origin": "遠渡重洋而來的劍術世家第三代。",
+        "range": 55,
+        "speed": 48,
+        "story": "藍眼睛的劍客，劍法和牠的叫聲一樣尖銳。據說從沒有老鼠看清楚牠的出劍。",
+        "tier": "B"
+      },
+      {
+        "ability": "area",
+        "ability_text": "遠程範圍魔法：在目標周圍炸開星光。",
+        "ability_value": 0,
+        "atk": 45,
+        "cooldown": 11,
+        "cost": 380,
+        "hp": 300,
+        "id": "b2",
+        "interval": 2,
+        "knockbacks": 2,
+        "look": {
+          "accent": "#b9a7e6",
+          "accessory": "staff",
+          "fur": "#f4f0fa",
+          "pattern": "plain",
+          "size": 1.1
+        },
+        "name": "波斯法師",
+        "origin": "從古老地毯的花紋裡走出來的魔法貓。",
+        "range": 160,
+        "speed": 34,
+        "story": "蓬鬆的長毛裡藏著上百顆星星。牠打一個噴嚏，就會有一場流星雨。",
+        "tier": "B"
+      },
+      {
+        "ability": "knockback",
+        "ability_text": "超厚血量，20% 機率擊退。",
+        "ability_value": 0.2,
+        "atk": 30,
+        "cooldown": 14,
+        "cost": 450,
+        "hp": 2200,
+        "id": "b3",
+        "interval": 1.6,
+        "knockbacks": 3,
+        "look": {
+          "accent": "#d9c2a3",
+          "accessory": "armor",
+          "fur": "#7a5a3c",
+          "pattern": "stripes",
+          "size": 1.4
+        },
+        "name": "緬因巨人",
+        "origin": "北方森林的伐木工人養大的溫柔巨人。",
+        "range": 45,
+        "speed": 26,
+        "story": "牠站起來比門還高，躺下來比沙發還長。老鼠看到牠都以為是一座毛茸茸的山。",
+        "tier": "B"
+      },
+      {
+        "ability": "heal",
+        "ability_text": "每 3 秒替附近的貓咪回復體力。",
+        "ability_value": 40,
+        "atk": 15,
+        "cooldown": 12,
+        "cost": 350,
+        "hp": 360,
+        "id": "b4",
+        "interval": 1.2,
+        "knockbacks": 2,
+        "look": {
+          "accent": "#8c7a6b",
+          "accessory": "hat",
+          "fur": "#f7f3ee",
+          "pattern": "point",
+          "size": 1.05
+        },
+        "name": "布偶護士",
+        "origin": "動物醫院的鎮院之寶，退休後來前線當護理長。",
+        "range": 50,
+        "speed": 36,
+        "story": "抱起來軟綿綿的布偶貓，會用尾巴輕輕拍你的頭說「不痛不痛」。",
+        "tier": "B"
+      },
+      {
+        "ability": "ranged",
+        "ability_text": "長距離射擊，躲在後方也能命中。",
+        "ability_value": 0,
+        "atk": 48,
+        "cooldown": 9,
+        "cost": 320,
+        "hp": 260,
+        "id": "b5",
+        "interval": 1.8,
+        "knockbacks": 2,
+        "look": {
+          "accent": "#3b3f46",
+          "accessory": "bowcap",
+          "fur": "#c9ced6",
+          "pattern": "stripes",
+          "size": 1
+        },
+        "name": "美短弓手",
+        "origin": "曾經是逗貓棒大賽的冠軍，後來改玩真正的弓。",
+        "range": 240,
+        "speed": 38,
+        "story": "銀色條紋的神射手，能從客廳一箭射中廚房裡偷吃的老鼠。",
+        "tier": "B"
+      },
+      {
+        "ability": "slow",
+        "ability_text": "打中的老鼠會被拖慢 40%。",
+        "ability_value": 0.4,
+        "atk": 32,
+        "cooldown": 8,
+        "cost": 280,
+        "hp": 320,
+        "id": "b6",
+        "interval": 0.8,
+        "knockbacks": 2,
+        "look": {
+          "accent": "#9fb0c2",
+          "accessory": "scarf",
+          "fur": "#5d6b7a",
+          "pattern": "plain",
+          "size": 0.95
+        },
+        "name": "折耳忍者",
+        "origin": "隱居在屋頂上的神秘貓族，以安靜聞名。",
+        "range": 50,
+        "speed": 75,
+        "story": "耳朵摺起來是為了不被發現。牠會在老鼠的腳上偷偷綁上毛線。",
+        "tier": "B"
+      },
+      {
+        "ability": "area",
+        "ability_text": "丟雪球：在目標周圍炸開一小片雪花，便宜又能打一群。",
+        "ability_value": 0,
+        "atk": 14,
+        "cooldown": 5,
+        "cost": 140,
+        "hp": 160,
+        "id": "c9",
+        "interval": 1.8,
+        "knockbacks": 2,
+        "look": {
+          "accent": "#8fc8f0",
+          "accessory": "scarf",
+          "fur": "#f7fbff",
+          "pattern": "plain",
+          "size": 0.9
+        },
+        "name": "雪球喵",
+        "origin": "第二章在冰冷的地下河加入，最喜歡冰霜鼠吐出來的冷氣。",
+        "range": 140,
+        "release": "2026-10-26",
+        "speed": 40,
+        "story": "冬天第一場雪落下時出生的小貓，口袋裡永遠有一顆捏好的雪球。牠說這是禮物，老鼠覺得這是攻擊。",
+        "tier": "C"
+      },
+      {
+        "ability": "slow",
+        "ability_text": "遠距離詛咒，讓老鼠變慢 45%，剋制跑很快的幽靈鼠。",
+        "ability_value": 0.45,
+        "atk": 40,
+        "cooldown": 10,
+        "cost": 340,
+        "hp": 300,
+        "id": "b7",
+        "interval": 1.8,
+        "knockbacks": 2,
+        "look": {
+          "accent": "#9b59b6",
+          "accessory": "hat",
+          "fur": "#2b2b33",
+          "pattern": "plain",
+          "size": 1
+        },
+        "name": "黑貓巫女",
+        "origin": "第二章在月夜墓園遇見的巫女，最怕的是南瓜被打破。",
+        "range": 200,
+        "release": "2026-10-26",
+        "speed": 34,
+        "story": "住在墓園旁的小屋，每天晚上替迷路的幽靈點一盞燈。幽靈鼠鬧事以後，她拿起掃把加入了靴貓軍團。",
+        "tier": "B"
+      },
+      {
+        "ability": "launch",
+        "ability_text": "範圍重擊，把老鼠整群揍飛。",
+        "ability_value": 120,
+        "atk": 140,
+        "cooldown": 22,
+        "copies": 8,
+        "cost": 800,
+        "hp": 2600,
+        "id": "a1",
+        "interval": 1.8,
+        "knockbacks": 3,
+        "look": {
+          "accent": "#9b5a1a",
+          "accessory": "cape",
+          "fur": "#e8a33d",
+          "pattern": "plain",
+          "size": 1.35
+        },
+        "name": "獅子王喵",
+        "origin": "自稱是獅子的遠房表親，其實只是很有自信的大橘貓。",
+        "range": 70,
+        "speed": 40,
+        "story": "鬃毛是自己用梳子梳出來的。牠一吼，整片草原的老鼠都會往後飛。",
+        "tier": "A"
+      },
+      {
+        "ability": "pierce",
+        "ability_text": "超遠距離狙擊，子彈會穿透後面的老鼠。",
+        "ability_value": 0.5,
+        "atk": 160,
+        "cooldown": 20,
+        "copies": 8,
+        "cost": 750,
+        "hp": 600,
+        "id": "a2",
+        "interval": 2.6,
+        "knockbacks": 2,
+        "look": {
+          "accent": "#9ec5ff",
+          "accessory": "goggles",
+          "fur": "#2f3a5c",
+          "pattern": "spots",
+          "size": 1.05
+        },
+        "name": "星空狙擊喵",
+        "origin": "天文台的觀星貓，用望遠鏡瞄準了第一隻老鼠。",
+        "range": 450,
+        "speed": 32,
+        "story": "牠總是在屋頂上看星星，其實是在計算風向和彈道。",
+        "tier": "A"
+      },
+      {
+        "ability": "freeze",
+        "ability_text": "範圍冰凍，被打中的老鼠停住 2 秒。",
+        "ability_value": 2,
+        "atk": 70,
+        "cooldown": 20,
+        "copies": 8,
+        "cost": 700,
+        "hp": 1200,
+        "id": "a3",
+        "interval": 2.2,
+        "knockbacks": 2,
+        "look": {
+          "accent": "#7cc4ff",
+          "accessory": "crown",
+          "fur": "#e8f4ff",
+          "pattern": "plain",
+          "size": 1.1
+        },
+        "name": "冰雪女王喵",
+        "origin": "冬天在冰箱旁邊出生的貓，從小就喜歡冷冷的地方。",
+        "range": 180,
+        "speed": 36,
+        "story": "她一眨眼，窗戶就結霜；她一揮尾巴，整片走廊都變成溜冰場。",
+        "tier": "A"
+      },
+      {
+        "ability": "rocket",
+        "ability_text": "發射火箭，在落點炸出大範圍傷害。",
+        "ability_value": 90,
+        "atk": 110,
+        "cooldown": 25,
+        "copies": 8,
+        "cost": 900,
+        "hp": 4000,
+        "id": "a4",
+        "interval": 2.5,
+        "knockbacks": 3,
+        "look": {
+          "accent": "#ff7b54",
+          "accessory": "armor",
+          "fur": "#8e9aa6",
+          "pattern": "plain",
+          "size": 1.3
+        },
+        "name": "機甲喵",
+        "origin": "車庫裡的發明家貓，最大的夢想是飛上月球。",
+        "range": 220,
+        "speed": 30,
+        "story": "駕駛著用紙箱和罐頭改裝的機器人。駕駛艙裡永遠放著一包零食。",
+        "tier": "A"
+      },
+      {
+        "ability": "crit",
+        "ability_text": "居合斬：40% 機率爆擊，造成 2.5 倍傷害。",
+        "ability_value": 0.4,
+        "atk": 150,
+        "cooldown": 20,
+        "copies": 8,
+        "cost": 750,
+        "hp": 1800,
+        "id": "a5",
+        "interval": 1.2,
+        "knockbacks": 2,
+        "look": {
+          "accent": "#f7a8c4",
+          "accessory": "sword",
+          "fur": "#f5f0e6",
+          "pattern": "calico",
+          "size": 1.1
+        },
+        "name": "櫻花武士喵",
+        "origin": "神社旁的流浪貓，跟著看門的老武士學了一身刀法。",
+        "range": 60,
+        "speed": 55,
+        "story": "每年春天都在櫻花樹下練刀，花瓣落地之前就能砍出三刀。",
+        "tier": "A"
+      },
+      {
+        "ability": "area",
+        "ability_text": "開砲：炮彈在目標周圍炸開，打中一片老鼠。",
+        "ability_value": 0,
+        "atk": 100,
+        "cooldown": 22,
+        "copies": 8,
+        "cost": 850,
+        "hp": 2400,
+        "id": "a6",
+        "interval": 2.4,
+        "knockbacks": 3,
+        "look": {
+          "accent": "#d9b26b",
+          "accessory": "hat",
+          "fur": "#4a4a4a",
+          "pattern": "tux",
+          "size": 1.2
+        },
+        "name": "海盜船長喵",
+        "origin": "漁港的老大，帶著一整船的貓水手來助陣。",
+        "range": 240,
+        "speed": 34,
+        "story": "搶過的魚罐頭比走過的海還多。牠的大砲裡裝的其實是毛線球。",
+        "tier": "A"
+      },
+      {
+        "ability": "knockback",
+        "ability_text": "南瓜盾牌重擊，35% 機率把老鼠擊退，非常耐打。",
+        "ability_value": 0.35,
+        "atk": 120,
+        "cooldown": 22,
+        "copies": 8,
+        "cost": 820,
+        "hp": 3000,
+        "id": "a7",
+        "interval": 1.6,
+        "knockbacks": 3,
+        "look": {
+          "accent": "#ff7b1e",
+          "accessory": "armor",
+          "fur": "#f2a65a",
+          "pattern": "stripes",
+          "size": 1.3
+        },
+        "name": "南瓜騎士喵",
+        "origin": "萬聖節之後加入的守護者，盾牌上還留著老鼠的牙印。",
+        "range": 60,
+        "release": "2026-10-26",
+        "speed": 38,
+        "story": "披著南瓜盔甲的騎士，盔甲是萬聖節那晚從南瓜炸彈鼠手上搶來的。從此牠發誓要保護所有不敢走夜路的小貓。",
+        "tier": "A"
+      },
+      {
+        "ability": "pierce",
+        "ability_text": "燈籠光束：會穿過前面的老鼠，連後排一起照到。",
+        "ability_value": 0.4,
+        "atk": 36,
+        "cooldown": 11,
+        "cost": 360,
+        "hp": 280,
+        "id": "b8",
+        "interval": 2,
+        "knockbacks": 2,
+        "look": {
+          "accent": "#f4c95d",
+          "accessory": "cape",
+          "fur": "#8a8f99",
+          "pattern": "plain",
+          "size": 1
+        },
+        "name": "燈籠喵",
+        "origin": "第二章在黑暗回廊遇見的點燈人，和黑貓巫女是老朋友。",
+        "range": 220,
+        "release": "2026-10-26",
+        "speed": 34,
+        "story": "夜裡替迷路的小貓點燈的守夜人。燈籠的光一照，躲在黑暗裡的老鼠就無所遁形。",
+        "tier": "B"
+      },
+      {
+        "ability": "lightning",
+        "ability_text": "雷鼓一響，落雷劈中場上所有老鼠（威力比天神喵喵小）。",
+        "ability_value": 0.25,
+        "atk": 70,
+        "cooldown": 24,
+        "copies": 8,
+        "cost": 880,
+        "hp": 1600,
+        "id": "a8",
+        "interval": 3.2,
+        "knockbacks": 3,
+        "look": {
+          "accent": "#e2b33c",
+          "accessory": "halo",
+          "fur": "#fff4dc",
+          "pattern": "spots",
+          "size": 1.15
+        },
+        "name": "雷鼓喵",
+        "origin": "第二章在雷雨山谷加入，據說是天神喵喵的徒弟。",
+        "range": 200,
+        "release": "2026-10-26",
+        "speed": 36,
+        "story": "祭典上最受歡迎的鼓手，每打一下鼓，天上就跟著打一聲雷。雷電鼠聽到牠的鼓聲都會嚇得把電收回去。",
+        "tier": "A"
+      },
+      {
+        "ability": "lightning",
+        "ability_text": "每次攻擊都召喚雷電，劈中場上所有老鼠並擊退。",
+        "ability_value": 0.5,
+        "atk": 220,
+        "cooldown": 40,
+        "copies": 5,
+        "cost": 1500,
+        "hp": 3500,
+        "id": "s1",
+        "interval": 3,
+        "knockbacks": 3,
+        "look": {
+          "accent": "#ffd34d",
+          "accessory": "halo",
+          "fur": "#fff6d8",
+          "pattern": "plain",
+          "size": 1.3
+        },
+        "name": "天神喵喵",
+        "origin": "靴貓公益站開站那天，從天上掉下來的第一道光。",
+        "range": 300,
+        "speed": 34,
+        "story": "傳說中住在雲端的貓神。打雷的時候，其實是祂在打呼。",
+        "tier": "S"
+      },
+      {
+        "ability": "timewarp",
+        "ability_text": "每 10 秒扭曲時空，把附近的老鼠推回去並凍結。",
+        "ability_value": 200,
+        "atk": 180,
+        "cooldown": 38,
+        "copies": 5,
+        "cost": 1400,
+        "hp": 3000,
+        "id": "s2",
+        "interval": 2.4,
+        "knockbacks": 3,
+        "look": {
+          "accent": "#c9a6ff",
+          "accessory": "clock",
+          "fur": "#4a3b6b",
+          "pattern": "spots",
+          "size": 1.2
+        },
+        "name": "時空旅喵",
+        "origin": "從一台壞掉的時鐘裡跳出來，至今沒人知道牠的真名。",
+        "range": 160,
+        "speed": 40,
+        "story": "牠來自一百年後的未來，那時候世界上已經沒有老鼠了——因為牠回到過去把牠們都趕跑了。",
+        "tier": "S"
+      },
+      {
+        "ability": "freeze",
+        "ability_text": "狐火冰封：範圍攻擊，被打中的老鼠凍住 3 秒。",
+        "ability_value": 3,
+        "atk": 170,
+        "cooldown": 38,
+        "copies": 5,
+        "cost": 1450,
+        "hp": 3200,
+        "id": "s3",
+        "interval": 2.2,
+        "knockbacks": 3,
+        "look": {
+          "accent": "#9fd8ff",
+          "accessory": "staff",
+          "fur": "#fff3e0",
+          "pattern": "plain",
+          "size": 1.25
+        },
+        "name": "九尾貓仙",
+        "origin": "深山古廟的守護者，聽說喵喵們在打仗，特地下山幫忙。",
+        "range": 200,
+        "speed": 36,
+        "story": "活了九百年的貓仙，每一條尾巴都藏著一盞狐火。牠很少出手，一出手整條戰線都會結冰。",
+        "tier": "S"
+      },
+      {
+        "ability": "heal",
+        "ability_text": "浴火重生的神鳥，每 3 秒替附近所有貓咪補血，還能從遠處噴出火焰。",
+        "ability_value": 30,
+        "atk": 140,
+        "cooldown": 38,
+        "copies": 5,
+        "cost": 1450,
+        "hp": 2800,
+        "id": "s4",
+        "interval": 2,
+        "knockbacks": 3,
+        "look": {
+          "accent": "#ffd54a",
+          "accessory": "halo",
+          "fur": "#ff8a3d",
+          "pattern": "plain",
+          "size": 1.3
+        },
+        "name": "鳳凰神喵",
+        "origin": "聽見靴貓軍團的呼喚，從南方的火山飛來助陣。",
+        "range": 220,
+        "release": "2026-10-25",
+        "speed": 36,
+        "story": "傳說每一百年會在火山口重生一次的神喵。牠的羽毛落在哪裡，哪裡受傷的貓咪就會好起來。",
+        "tier": "S"
+      }
+    ],
+    "items": [
+      {
+        "description": "戰鬥開始時多 300 金幣。",
+        "id": "start_coins",
+        "name": "開場金幣",
+        "price": 60
+      },
+      {
+        "description": "這場戰鬥金幣累積速度 +30%。",
+        "id": "fast_coins",
+        "name": "加速補給",
+        "price": 80
+      },
+      {
+        "description": "這場戰鬥貓塔血量 +50%。",
+        "id": "strong_base",
+        "name": "主堡加固",
+        "price": 80
+      },
+      {
+        "description": "開場時貓爪砲直接充滿。",
+        "id": "cannon_ready",
+        "name": "貓爪砲預熱",
+        "price": 50
+      },
+      {
+        "description": "這場戰鬥所有貓咪攻擊力 +15%。",
+        "id": "rally",
+        "name": "全軍振奮",
+        "price": 100
+      }
+    ],
+    "mice": [
+      {
+        "ability": "none",
+        "ability_text": "最常見的小老鼠。",
+        "ability_value": 0,
+        "armor": 0,
+        "atk": 8,
+        "dodge": 0,
+        "hp": 100,
+        "id": "m1",
+        "interval": 1,
+        "knockbacks": 1,
+        "look": {
+          "accent": "#f0c8c8",
+          "accessory": "none",
+          "fur": "#8d8d95",
+          "pattern": "",
+          "size": 0.9
+        },
+        "money": 15,
+        "name": "小灰鼠",
+        "range": 35,
+        "speed": 40,
+        "story": "什麼都想咬一口的小灰鼠，是鼠軍團裡人數最多的兵。",
+        "tier": "C",
+        "weight": 2
+      },
+      {
+        "ability": "none",
+        "ability_text": "很能挨打的胖老鼠。",
+        "ability_value": 0,
+        "armor": 0,
+        "atk": 10,
+        "dodge": 0,
+        "hp": 450,
+        "id": "m2",
+        "interval": 1.4,
+        "knockbacks": 2,
+        "look": {
+          "accent": "#f3d9c6",
+          "accessory": "none",
+          "fur": "#a38b76",
+          "pattern": "",
+          "size": 1.25
+        },
+        "money": 40,
+        "name": "胖胖鼠",
+        "range": 35,
+        "speed": 25,
+        "story": "偷吃了整袋飼料的胖老鼠，走路都會喘，但很難推倒。",
+        "tier": "C",
+        "weight": 6
+      },
+      {
+        "ability": "none",
+        "ability_text": "跑得非常快。",
+        "ability_value": 0,
+        "armor": 0,
+        "atk": 12,
+        "dodge": 0,
+        "hp": 90,
+        "id": "m3",
+        "interval": 0.8,
+        "knockbacks": 1,
+        "look": {
+          "accent": "#ffe0b0",
+          "accessory": "scarf",
+          "fur": "#b5a07a",
+          "pattern": "",
+          "size": 0.85
+        },
+        "money": 25,
+        "name": "疾風鼠",
+        "range": 35,
+        "speed": 85,
+        "story": "綁著頭巾的短跑選手，跑過去只會留下一陣風和一點餅乾屑。",
+        "tier": "C",
+        "weight": 1
+      },
+      {
+        "ability": "ranged",
+        "ability_text": "會從遠處射小石頭。",
+        "ability_value": 0,
+        "armor": 0,
+        "atk": 14,
+        "dodge": 0,
+        "hp": 120,
+        "id": "m4",
+        "interval": 1.8,
+        "knockbacks": 1,
+        "look": {
+          "accent": "#e6e2c8",
+          "accessory": "goggles",
+          "fur": "#7b7f6a",
+          "pattern": "",
+          "size": 0.9
+        },
+        "money": 35,
+        "name": "彈弓鼠",
+        "range": 130,
+        "speed": 32,
+        "story": "隨身帶著彈弓和一口袋的小石頭，最喜歡躲在後面偷襲。",
+        "tier": "C",
+        "weight": 2
+      },
+      {
+        "ability": "none",
+        "ability_text": "戴著安全帽，減少 30% 傷害。",
+        "ability_value": 0,
+        "armor": 0.3,
+        "atk": 18,
+        "dodge": 0,
+        "hp": 300,
+        "id": "m5",
+        "interval": 1.3,
+        "knockbacks": 1,
+        "look": {
+          "accent": "#d9c7b0",
+          "accessory": "hat",
+          "fur": "#6d5d4b",
+          "pattern": "",
+          "size": 1
+        },
+        "money": 45,
+        "name": "礦工鼠",
+        "range": 40,
+        "speed": 34,
+        "story": "在地底挖了一輩子隧道的老礦工，安全帽是牠最寶貝的東西。",
+        "tier": "C",
+        "weight": 5
+      },
+      {
+        "ability": "none",
+        "ability_text": "有 20% 機率閃開攻擊。",
+        "ability_value": 0,
+        "armor": 0,
+        "atk": 16,
+        "dodge": 0.2,
+        "hp": 160,
+        "id": "m6",
+        "interval": 1,
+        "knockbacks": 1,
+        "look": {
+          "accent": "#fff0d0",
+          "accessory": "none",
+          "fur": "#c8a46b",
+          "pattern": "",
+          "size": 0.85
+        },
+        "money": 35,
+        "name": "跳跳鼠",
+        "range": 40,
+        "speed": 60,
+        "story": "彈跳力驚人的小傢伙，你一伸爪，牠就跳到你頭上了。",
+        "tier": "C",
+        "weight": 1
+      },
+      {
+        "ability": "none",
+        "ability_text": "成群結隊出現的迷你老鼠。",
+        "ability_value": 0,
+        "armor": 0,
+        "atk": 6,
+        "dodge": 0,
+        "hp": 60,
+        "id": "m7",
+        "interval": 0.9,
+        "knockbacks": 0,
+        "look": {
+          "accent": "#f5d0d0",
+          "accessory": "none",
+          "fur": "#a0a0a8",
+          "pattern": "",
+          "size": 0.7
+        },
+        "money": 10,
+        "name": "吱吱鼠群",
+        "range": 30,
+        "speed": 55,
+        "story": "一隻不可怕，一百隻就很可怕了。牠們總是一起吱吱叫。",
+        "tier": "C",
+        "weight": 1
+      },
+      {
+        "ability": "tunnel",
+        "ability_text": "從地底鑽出來，一出現就在戰場中段。",
+        "ability_value": 300,
+        "armor": 0,
+        "atk": 22,
+        "dodge": 0,
+        "hp": 260,
+        "id": "m8",
+        "interval": 1.5,
+        "knockbacks": 1,
+        "look": {
+          "accent": "#e8a0a0",
+          "accessory": "goggles",
+          "fur": "#4b3b33",
+          "pattern": "",
+          "size": 1
+        },
+        "money": 50,
+        "name": "鼴鼠",
+        "range": 40,
+        "speed": 30,
+        "story": "其實不是老鼠，是被老鼠用三包瓜子雇來的傭兵。",
+        "tier": "C",
+        "weight": 4
+      },
+      {
+        "ability": "none",
+        "ability_text": "穿著盔甲的老鼠騎士。",
+        "ability_value": 0,
+        "armor": 0,
+        "atk": 40,
+        "dodge": 0,
+        "hp": 900,
+        "id": "m9",
+        "interval": 1.2,
+        "knockbacks": 2,
+        "look": {
+          "accent": "#d9dee8",
+          "accessory": "armor",
+          "fur": "#8a8f9a",
+          "pattern": "",
+          "size": 1.1
+        },
+        "money": 120,
+        "name": "鼠騎士",
+        "range": 50,
+        "speed": 45,
+        "story": "騎著一隻蝸牛衝鋒的騎士，牠堅持那是一匹馬。",
+        "tier": "B",
+        "weight": 7
+      },
+      {
+        "ability": "slow",
+        "ability_text": "毒液會讓貓咪變慢 30%。",
+        "ability_value": 0.3,
+        "armor": 0,
+        "atk": 25,
+        "dodge": 0,
+        "hp": 500,
+        "id": "m10",
+        "interval": 1.6,
+        "knockbacks": 1,
+        "look": {
+          "accent": "#c6e6a8",
+          "accessory": "staff",
+          "fur": "#6f8a5a",
+          "pattern": "",
+          "size": 1
+        },
+        "money": 110,
+        "name": "毒藥鼠",
+        "range": 110,
+        "speed": 34,
+        "story": "在下水道調配奇怪藥水的老鼠，瓶子裡的東西連牠自己都不敢喝。",
+        "tier": "B",
+        "weight": 3
+      },
+      {
+        "ability": "area",
+        "ability_text": "投出大石頭，砸中一片貓咪。",
+        "ability_value": 0,
+        "armor": 0,
+        "atk": 45,
+        "dodge": 0,
+        "hp": 450,
+        "id": "m11",
+        "interval": 2.4,
+        "knockbacks": 1,
+        "look": {
+          "accent": "#e8d8c0",
+          "accessory": "hat",
+          "fur": "#8b7a66",
+          "pattern": "",
+          "size": 1.05
+        },
+        "money": 130,
+        "name": "投石鼠",
+        "range": 200,
+        "speed": 28,
+        "story": "推著迷你投石車的工兵，石頭都是從貓砂盆裡撿來的。",
+        "tier": "B",
+        "weight": 5
+      },
+      {
+        "ability": "none",
+        "ability_text": "舉著鍋蓋盾，減少 40% 傷害且不會被擊退。",
+        "ability_value": 0,
+        "armor": 0.4,
+        "atk": 20,
+        "dodge": 0,
+        "hp": 1600,
+        "id": "m12",
+        "interval": 1.6,
+        "knockbacks": 0,
+        "look": {
+          "accent": "#c0c4cc",
+          "accessory": "armor",
+          "fur": "#7d7d86",
+          "pattern": "",
+          "size": 1.15
+        },
+        "money": 150,
+        "name": "盾牌鼠",
+        "range": 40,
+        "speed": 26,
+        "story": "把廚房的鍋蓋當盾牌，叮叮噹噹地前進。",
+        "tier": "B",
+        "weight": 9
+      },
+      {
+        "ability": "none",
+        "ability_text": "動作敏捷，有 30% 機率閃避。",
+        "ability_value": 0,
+        "armor": 0,
+        "atk": 50,
+        "dodge": 0.3,
+        "hp": 520,
+        "id": "m13",
+        "interval": 0.8,
+        "knockbacks": 1,
+        "look": {
+          "accent": "#8c8c9a",
+          "accessory": "scarf",
+          "fur": "#3d3d48",
+          "pattern": "",
+          "size": 0.95
+        },
+        "money": 140,
+        "name": "忍者鼠",
+        "range": 45,
+        "speed": 80,
+        "story": "黑色頭巾的刺客，宣稱自己學的是正宗的「鼠流忍術」。",
+        "tier": "B",
+        "weight": 3
+      },
+      {
+        "ability": "area",
+        "ability_text": "遠程範圍魔法。",
+        "ability_value": 0,
+        "armor": 0,
+        "atk": 55,
+        "dodge": 0,
+        "hp": 600,
+        "id": "m14",
+        "interval": 2.2,
+        "knockbacks": 1,
+        "look": {
+          "accent": "#d0c0f0",
+          "accessory": "staff",
+          "fur": "#6b5c8a",
+          "pattern": "",
+          "size": 1
+        },
+        "money": 160,
+        "name": "鼠法師",
+        "range": 170,
+        "speed": 30,
+        "story": "戴著尖帽子的老鼠巫師，最拿手的咒語是「起司起司變變變」。",
+        "tier": "B",
+        "weight": 4
+      },
+      {
+        "ability": "knockback",
+        "ability_text": "範圍重擊，30% 機率把貓咪擊退。",
+        "ability_value": 0.3,
+        "armor": 0,
+        "atk": 90,
+        "dodge": 0,
+        "hp": 4000,
+        "id": "m15",
+        "interval": 1.8,
+        "knockbacks": 2,
+        "look": {
+          "accent": "#d8c0a0",
+          "accessory": "crown",
+          "fur": "#7a6650",
+          "pattern": "",
+          "size": 1.4
+        },
+        "money": 400,
+        "name": "鼠將軍",
+        "range": 70,
+        "speed": 30,
+        "story": "身經百戰的將軍，胸前掛滿了用瓶蓋做的勳章。",
+        "tier": "A",
+        "weight": 12
+      },
+      {
+        "ability": "area",
+        "ability_text": "發射煙火火箭，大範圍爆炸。",
+        "ability_value": 0,
+        "armor": 0,
+        "atk": 120,
+        "dodge": 0,
+        "hp": 1800,
+        "id": "m16",
+        "interval": 2.8,
+        "knockbacks": 2,
+        "look": {
+          "accent": "#ffb088",
+          "accessory": "goggles",
+          "fur": "#9a5a4a",
+          "pattern": "",
+          "size": 1.15
+        },
+        "money": 380,
+        "name": "火箭鼠",
+        "range": 280,
+        "speed": 32,
+        "story": "過年時偷了一整箱沖天炮，從此迷上了爆炸的聲音。",
+        "tier": "A",
+        "weight": 6
+      },
+      {
+        "ability": "none",
+        "ability_text": "鋼鐵身軀，減少 30% 傷害。",
+        "ability_value": 0,
+        "armor": 0.3,
+        "atk": 70,
+        "dodge": 0,
+        "hp": 6000,
+        "id": "m17",
+        "interval": 2,
+        "knockbacks": 2,
+        "look": {
+          "accent": "#c8d2dc",
+          "accessory": "armor",
+          "fur": "#7f8a96",
+          "pattern": "",
+          "size": 1.45
+        },
+        "money": 450,
+        "name": "機械鼠",
+        "range": 60,
+        "speed": 22,
+        "story": "用舊鬧鐘和吸塵器零件拼成的戰鬥機器，裡面坐著三隻老鼠輪流踩踏板。",
+        "tier": "A",
+        "weight": 15
+      },
+      {
+        "ability": "none",
+        "ability_text": "來去如影，有 25% 機率閃避。",
+        "ability_value": 0,
+        "armor": 0,
+        "atk": 150,
+        "dodge": 0.25,
+        "hp": 2000,
+        "id": "m18",
+        "interval": 1,
+        "knockbacks": 1,
+        "look": {
+          "accent": "#7a5aa0",
+          "accessory": "cape",
+          "fur": "#2a2433",
+          "pattern": "",
+          "size": 1.05
+        },
+        "money": 420,
+        "name": "暗影鼠",
+        "range": 50,
+        "speed": 75,
+        "story": "沒人看過牠的臉，只知道牠出現的地方，罐罐都會不見。",
+        "tier": "A",
+        "weight": 4
+      },
+      {
+        "ability": "none",
+        "ability_text": "半透明的身體，45% 機率讓攻擊直接穿過去。",
+        "ability_value": 0,
+        "armor": 0,
+        "atk": 30,
+        "dodge": 0.45,
+        "hp": 380,
+        "id": "m21",
+        "interval": 1,
+        "knockbacks": 1,
+        "look": {
+          "accent": "#9fb4d9",
+          "accessory": "cape",
+          "fur": "#dfe7f2",
+          "pattern": "",
+          "size": 1
+        },
+        "money": 110,
+        "name": "幽靈鼠",
+        "range": 40,
+        "speed": 62,
+        "story": "萬聖節夜裡從墓園飄出來的老鼠。據說牠們生前都是偷吃供品被抓到的。",
+        "tier": "B",
+        "weight": 1
+      },
+      {
+        "ability": "area",
+        "ability_text": "丟出會爆炸的南瓜燈，砸中一片貓咪。",
+        "ability_value": 0,
+        "armor": 0,
+        "atk": 40,
+        "dodge": 0,
+        "hp": 420,
+        "id": "m22",
+        "interval": 2.4,
+        "knockbacks": 1,
+        "look": {
+          "accent": "#ff8a1e",
+          "accessory": "hat",
+          "fur": "#7a5a3a",
+          "pattern": "",
+          "size": 1.05
+        },
+        "money": 120,
+        "name": "南瓜炸彈鼠",
+        "range": 150,
+        "speed": 30,
+        "story": "把南瓜挖空塞滿火藥的搗蛋鬼。不給糖？那就給你一顆南瓜。",
+        "tier": "B",
+        "weight": 3
+      },
+      {
+        "ability": "heal",
+        "ability_text": "每 3 秒替附近的老鼠補血。先打倒牠，不然老鼠會越打越多血！",
+        "ability_value": 60,
+        "armor": 0,
+        "atk": 15,
+        "dodge": 0,
+        "hp": 520,
+        "id": "m23",
+        "interval": 1.6,
+        "knockbacks": 1,
+        "look": {
+          "accent": "#ff6b81",
+          "accessory": "bow",
+          "fur": "#ece6de",
+          "pattern": "",
+          "size": 1
+        },
+        "money": 140,
+        "name": "鼠醫生",
+        "range": 120,
+        "speed": 30,
+        "story": "地下王國唯一的醫生，背著一大包起司口味的藥丸。鼠大王倒下後，牠決定治好所有逃回來的士兵。",
+        "tier": "B",
+        "weight": 3
+      },
+      {
+        "ability": "freeze",
+        "ability_text": "冰霜吐息，讓一片貓咪凍住 1.2 秒。",
+        "ability_value": 1.2,
+        "armor": 0,
+        "atk": 70,
+        "dodge": 0,
+        "hp": 1600,
+        "id": "m24",
+        "interval": 2.6,
+        "knockbacks": 2,
+        "look": {
+          "accent": "#5aa9e6",
+          "accessory": "staff",
+          "fur": "#c4e5ff",
+          "pattern": "",
+          "size": 1.2
+        },
+        "money": 360,
+        "name": "冰霜鼠",
+        "range": 170,
+        "speed": 30,
+        "story": "住在地下河最冷的地方，鬍鬚上永遠結著冰。偷學了冰雪女王喵的魔法。",
+        "tier": "A",
+        "weight": 5
+      },
+      {
+        "ability": "timewarp",
+        "ability_text": "每 10 秒讓時間倒轉，把附近的貓咪往回推並定住 1.5 秒。",
+        "ability_value": 50,
+        "armor": 0.2,
+        "atk": 40,
+        "dodge": 0,
+        "hp": 1300,
+        "id": "m25",
+        "interval": 1.8,
+        "knockbacks": 2,
+        "look": {
+          "accent": "#ffd76e",
+          "accessory": "clock",
+          "fur": "#b08a5a",
+          "pattern": "",
+          "size": 1.25
+        },
+        "money": 400,
+        "name": "鐘錶鼠",
+        "range": 60,
+        "speed": 28,
+        "story": "鐘塔的看守者，懷裡的懷錶是從時空旅喵身上偷來的。牠只要轉一下發條，貓咪就會忘記剛剛往前走了幾步。",
+        "tier": "A",
+        "weight": 6
+      },
+      {
+        "ability": "lightning",
+        "ability_text": "召喚雷電，同時打中場上所有貓咪。",
+        "ability_value": 0.25,
+        "armor": 0,
+        "atk": 60,
+        "dodge": 0,
+        "hp": 1500,
+        "id": "m26",
+        "interval": 3,
+        "knockbacks": 2,
+        "look": {
+          "accent": "#ffe14a",
+          "accessory": "staff",
+          "fur": "#5a5a7a",
+          "pattern": "",
+          "size": 1.2
+        },
+        "money": 380,
+        "name": "雷電鼠",
+        "range": 200,
+        "speed": 30,
+        "story": "在雷雨山谷的山頂舉著鐵叉等閃電，被劈了九十九次之後，閃電開始聽牠的話。",
+        "tier": "A",
+        "weight": 4
+      },
+      {
+        "ability": "pierce",
+        "ability_text": "幽靈大軍的首領，攻擊會穿透前排，打中後面的貓咪。",
+        "ability_value": 0.6,
+        "armor": 0,
+        "atk": 240,
+        "dodge": 0.2,
+        "hp": 22000,
+        "id": "m27",
+        "interval": 2.2,
+        "knockbacks": 3,
+        "look": {
+          "accent": "#9fe8ff",
+          "accessory": "crown",
+          "fur": "#4a5a7a",
+          "pattern": "",
+          "size": 1.9
+        },
+        "money": 1400,
+        "name": "鼠鬼王",
+        "range": 80,
+        "speed": 20,
+        "story": "鼠大王的哥哥，很久以前就葬在月夜墓園。弟弟被打敗的消息吵醒了牠。",
+        "tier": "S",
+        "weight": 22
+      },
+      {
+        "ability": "area",
+        "ability_text": "全服頭目：一場打不倒，所有玩家的傷害都會扣在同一條血條上。重擊會砸中一片貓咪。",
+        "ability_value": 0,
+        "armor": 0,
+        "atk": 90,
+        "dodge": 0,
+        "hp": 3000000,
+        "id": "m28",
+        "interval": 3,
+        "knockbacks": 0,
+        "look": {
+          "accent": "#ff8a1e",
+          "accessory": "crown",
+          "fur": "#5a3a2a",
+          "pattern": "",
+          "size": 2.2
+        },
+        "money": 0,
+        "name": "南瓜鼠王",
+        "range": 70,
+        "speed": 16,
+        "story": "萬聖節夜裡從南瓜田爬出來的巨大老鼠，頭上頂著一顆會發光的巨大南瓜。牠說要把全世界的罐罐都換成南瓜派。",
+        "tier": "S",
+        "weight": 99
+      },
+      {
+        "ability": "knockback",
+        "ability_text": "王者重擊，範圍傷害並擊退貓咪。",
+        "ability_value": 0.4,
+        "armor": 0,
+        "atk": 200,
+        "dodge": 0,
+        "hp": 15000,
+        "id": "m19",
+        "interval": 2.2,
+        "knockbacks": 3,
+        "look": {
+          "accent": "#ffd76e",
+          "accessory": "crown",
+          "fur": "#6e5a48",
+          "pattern": "",
+          "size": 1.8
+        },
+        "money": 1000,
+        "name": "鼠大王",
+        "range": 90,
+        "speed": 22,
+        "story": "統治地下王國的大王，王座是一塊巨大的起司。牠發誓要吃光全世界的罐罐。",
+        "tier": "S",
+        "weight": 20
+      },
+      {
+        "ability": "summon",
+        "ability_text": "每 12 秒召喚鼠群，範圍攻擊並擊退。",
+        "ability_value": 12,
+        "armor": 0,
+        "atk": 300,
+        "dodge": 0,
+        "hp": 40000,
+        "id": "m20",
+        "interval": 2.6,
+        "knockbacks": 3,
+        "look": {
+          "accent": "#ff5a7a",
+          "accessory": "halo",
+          "fur": "#3a2a3a",
+          "pattern": "",
+          "size": 2
+        },
+        "money": 2000,
+        "name": "終焉鼠神",
+        "range": 160,
+        "speed": 18,
+        "story": "傳說中鼠族的始祖，在第一百關的盡頭等待著貓咪們。",
+        "tier": "S",
+        "weight": 30
+      }
+    ],
+    "rules": {
+      "cat_base_hp": 3000,
+      "chapter_rewards": [
+        40,
+        70,
+        110,
+        150,
+        180,
+        220,
+        250,
+        290,
+        330,
+        360
+      ],
+      "draw_price": 50,
+      "feed_hours": 72,
+      "feed_max_steps": 2,
+      "feed_price": {
+        "A": 60,
+        "S": 120
+      },
+      "feed_step": 25,
+      "level_growth": 0.1,
+      "max_item_stock": 9,
+      "max_level": 100,
+      "planned_stages": 100,
+      "start_coins": 150,
+      "starter_cats": [
+        "c1",
+        "c2",
+        "c3"
+      ],
+      "team_size": 10,
+      "ten_draw_price": 450,
+      "tier_odds": {
+        "A": 0.09,
+        "B": 0.28,
+        "C": 0.6,
+        "S": 0.03
+      },
+      "upgrade_base": {
+        "A": 15,
+        "B": 10,
+        "C": 5,
+        "S": 25
+      }
+    },
+    "stages": [
+      {
+        "base_hp": 3000,
+        "chapter": 1,
+        "description": "後院出現了一群偷吃飼料的小老鼠，把牠們趕回去！",
+        "id": 1,
+        "min_seconds": 45,
+        "name": "後院的騷動",
+        "recommend_level": 1,
+        "reward": 40,
+        "scale": 2.16,
+        "shield_seconds": 0,
+        "tip": "先派便宜的白糰子、阿橘擋住老鼠，金幣存夠了再按左下角升級錢包，之後出兵會更快。",
+        "waves": [
+          {
+            "at": 4,
+            "count": 2,
+            "every": 6.6,
+            "gap": 3,
+            "mouse": "m1",
+            "repeat": 60
+          },
+          {
+            "at": 50,
+            "count": 1,
+            "every": 15.4,
+            "gap": 0,
+            "mouse": "m2",
+            "repeat": 23
+          },
+          {
+            "at": 330,
+            "count": 6,
+            "gap": 1.2,
+            "mouse": "m1"
+          },
+          {
+            "at": 340,
+            "count": 2,
+            "gap": 4,
+            "mouse": "m2"
+          },
+          {
+            "at": 0,
+            "count": 3,
+            "gap": 2,
+            "mouse": "m1",
+            "trigger": 70
+          },
+          {
+            "at": 0,
+            "count": 3,
+            "gap": 2.5,
+            "mouse": "m2",
+            "trigger": 40
+          },
+          {
+            "at": 1,
+            "count": 8,
+            "gap": 0.6,
+            "mouse": "m1",
+            "trigger": 40
+          },
+          {
+            "at": 0,
+            "count": 3,
+            "gap": 2,
+            "mouse": "m1",
+            "trigger": 15
+          },
+          {
+            "at": 0,
+            "count": 2,
+            "gap": 4,
+            "mouse": "m2",
+            "trigger": 15
+          }
+        ]
+      },
+      {
+        "base_hp": 3200,
+        "chapter": 1,
+        "description": "跑得飛快的疾風鼠在穀倉裡亂竄。",
+        "id": 2,
+        "min_seconds": 45,
+        "name": "穀倉小偷",
+        "recommend_level": 2,
+        "reward": 70,
+        "scale": 2.7,
+        "shield_seconds": 0,
+        "tip": "疾風鼠跑得很快，多派幾隻前排擋住；黑豆跑得快，適合搶先打。",
+        "waves": [
+          {
+            "at": 4,
+            "count": 2,
+            "every": 6.6,
+            "gap": 3,
+            "mouse": "m1",
+            "repeat": 60
+          },
+          {
+            "at": 30,
+            "count": 2,
+            "every": 11,
+            "gap": 2,
+            "mouse": "m3",
+            "repeat": 34
+          },
+          {
+            "at": 70,
+            "count": 1,
+            "every": 17.6,
+            "gap": 0,
+            "mouse": "m2",
+            "repeat": 19
+          },
+          {
+            "at": 320,
+            "count": 6,
+            "gap": 1,
+            "mouse": "m3"
+          },
+          {
+            "at": 330,
+            "count": 2,
+            "gap": 5,
+            "mouse": "m2"
+          },
+          {
+            "at": 0,
+            "count": 3,
+            "gap": 2,
+            "mouse": "m1",
+            "trigger": 70
+          },
+          {
+            "at": 0,
+            "count": 3,
+            "gap": 2.5,
+            "mouse": "m2",
+            "trigger": 40
+          },
+          {
+            "at": 1,
+            "count": 8,
+            "gap": 0.6,
+            "mouse": "m1",
+            "trigger": 40
+          },
+          {
+            "at": 0,
+            "count": 3,
+            "gap": 2,
+            "mouse": "m1",
+            "trigger": 15
+          },
+          {
+            "at": 0,
+            "count": 2,
+            "gap": 4,
+            "mouse": "m2",
+            "trigger": 15
+          }
+        ]
+      },
+      {
+        "base_hp": 3400,
+        "chapter": 1,
+        "description": "小心後排的彈弓鼠，牠們會從遠處偷襲。",
+        "id": 3,
+        "min_seconds": 45,
+        "name": "彈弓埋伏",
+        "recommend_level": 5,
+        "reward": 110,
+        "scale": 2.49,
+        "shield_seconds": 0,
+        "tip": "彈弓鼠會從遠處偷襲，帶灰灰或美短弓手這類遠程貓，先把牠們打掉。",
+        "waves": [
+          {
+            "at": 4,
+            "count": 3,
+            "every": 7.9,
+            "gap": 2.5,
+            "mouse": "m1",
+            "repeat": 51
+          },
+          {
+            "at": 25,
+            "count": 1,
+            "every": 11,
+            "gap": 0,
+            "mouse": "m4",
+            "repeat": 35
+          },
+          {
+            "at": 60,
+            "count": 1,
+            "every": 17.6,
+            "gap": 0,
+            "mouse": "m2",
+            "repeat": 20
+          },
+          {
+            "at": 120,
+            "count": 2,
+            "every": 15.4,
+            "gap": 3,
+            "mouse": "m6",
+            "repeat": 19
+          },
+          {
+            "at": 330,
+            "count": 3,
+            "gap": 3,
+            "mouse": "m4"
+          },
+          {
+            "at": 335,
+            "count": 2,
+            "gap": 4,
+            "mouse": "m2"
+          },
+          {
+            "at": 340,
+            "count": 3,
+            "gap": 2,
+            "mouse": "m6"
+          },
+          {
+            "at": 0,
+            "count": 3,
+            "gap": 2,
+            "mouse": "m6",
+            "trigger": 70
+          },
+          {
+            "at": 0,
+            "count": 3,
+            "gap": 2.5,
+            "mouse": "m2",
+            "trigger": 40
+          },
+          {
+            "at": 1,
+            "count": 8,
+            "gap": 0.6,
+            "mouse": "m1",
+            "trigger": 40
+          },
+          {
+            "at": 0,
+            "count": 3,
+            "gap": 2,
+            "mouse": "m6",
+            "trigger": 15
+          },
+          {
+            "at": 0,
+            "count": 2,
+            "gap": 4,
+            "mouse": "m2",
+            "trigger": 15
+          }
+        ]
+      },
+      {
+        "base_hp": 3600,
+        "chapter": 1,
+        "description": "鼴鼠會直接從戰場中間鑽出來，礦工鼠也很耐打。",
+        "id": 4,
+        "min_seconds": 45,
+        "name": "地底來客",
+        "recommend_level": 6,
+        "reward": 150,
+        "scale": 2.68,
+        "shield_seconds": 0,
+        "tip": "鼴鼠會從戰場中間鑽出來，後排別只放脆皮貓；礦工鼠很耐打，用攻擊高的虎斑、暹羅劍士。",
+        "waves": [
+          {
+            "at": 4,
+            "count": 3,
+            "every": 7.9,
+            "gap": 2.5,
+            "mouse": "m1",
+            "repeat": 51
+          },
+          {
+            "at": 30,
+            "count": 1,
+            "every": 13.2,
+            "gap": 0,
+            "mouse": "m5",
+            "repeat": 29
+          },
+          {
+            "at": 45,
+            "count": 1,
+            "every": 13.2,
+            "gap": 0,
+            "mouse": "m4",
+            "repeat": 27
+          },
+          {
+            "at": 60,
+            "count": 1,
+            "every": 15.4,
+            "gap": 0,
+            "mouse": "m8",
+            "repeat": 23
+          },
+          {
+            "at": 330,
+            "count": 3,
+            "gap": 4,
+            "mouse": "m8"
+          },
+          {
+            "at": 335,
+            "count": 3,
+            "gap": 3,
+            "mouse": "m5"
+          },
+          {
+            "at": 0,
+            "count": 3,
+            "gap": 2,
+            "mouse": "m8",
+            "trigger": 70
+          },
+          {
+            "at": 0,
+            "count": 3,
+            "gap": 2.5,
+            "mouse": "m5",
+            "trigger": 40
+          },
+          {
+            "at": 1,
+            "count": 8,
+            "gap": 0.6,
+            "mouse": "m1",
+            "trigger": 40
+          },
+          {
+            "at": 0,
+            "count": 3,
+            "gap": 2,
+            "mouse": "m8",
+            "trigger": 15
+          },
+          {
+            "at": 0,
+            "count": 2,
+            "gap": 4,
+            "mouse": "m5",
+            "trigger": 15
+          }
+        ]
+      },
+      {
+        "base_hp": 3800,
+        "chapter": 1,
+        "description": "成群的吱吱鼠一湧而上，後面還跟著鼠騎士。",
+        "id": 5,
+        "min_seconds": 45,
+        "name": "鼠群暴走",
+        "recommend_level": 8,
+        "reward": 180,
+        "scale": 4,
+        "shield_seconds": 0,
+        "tip": "一大群小老鼠一起衝過來，一定要帶範圍攻擊的貓（三花妹、波斯法師），再加便宜的奶油、白糰子擋路。只帶單體攻擊的 B 級貓很難過。",
+        "waves": [
+          {
+            "at": 5,
+            "count": 6,
+            "every": 11,
+            "gap": 0.8,
+            "mouse": "m7",
+            "repeat": 36
+          },
+          {
+            "at": 20,
+            "count": 2,
+            "every": 12.3,
+            "gap": 2,
+            "mouse": "m3",
+            "repeat": 31
+          },
+          {
+            "at": 90,
+            "count": 1,
+            "every": 24.2,
+            "gap": 0,
+            "mouse": "m9",
+            "repeat": 13
+          },
+          {
+            "at": 330,
+            "count": 15,
+            "gap": 0.5,
+            "mouse": "m7"
+          },
+          {
+            "at": 335,
+            "count": 2,
+            "gap": 6,
+            "mouse": "m9"
+          },
+          {
+            "at": 0,
+            "count": 3,
+            "gap": 2,
+            "mouse": "m3",
+            "trigger": 70
+          },
+          {
+            "at": 0,
+            "count": 3,
+            "gap": 2.5,
+            "mouse": "m9",
+            "trigger": 40
+          },
+          {
+            "at": 1,
+            "count": 8,
+            "gap": 0.6,
+            "mouse": "m7",
+            "trigger": 40
+          },
+          {
+            "at": 0,
+            "count": 3,
+            "gap": 2,
+            "mouse": "m3",
+            "trigger": 15
+          },
+          {
+            "at": 0,
+            "count": 2,
+            "gap": 4,
+            "mouse": "m9",
+            "trigger": 15
+          }
+        ]
+      },
+      {
+        "base_hp": 4000,
+        "chapter": 1,
+        "description": "毒藥鼠會讓貓咪變慢，忍者鼠神出鬼沒。",
+        "id": 6,
+        "min_seconds": 45,
+        "name": "毒霧森林",
+        "recommend_level": 9,
+        "reward": 220,
+        "scale": 2.88,
+        "shield_seconds": 0,
+        "tip": "毒藥鼠會讓貓變慢、忍者鼠會閃避。帶範圍攻擊，再加布偶護士幫大家補血。",
+        "waves": [
+          {
+            "at": 4,
+            "count": 2,
+            "every": 8.8,
+            "gap": 3,
+            "mouse": "m6",
+            "repeat": 45
+          },
+          {
+            "at": 30,
+            "count": 1,
+            "every": 14.1,
+            "gap": 0,
+            "mouse": "m10",
+            "repeat": 27
+          },
+          {
+            "at": 50,
+            "count": 2,
+            "every": 16.7,
+            "gap": 4,
+            "mouse": "m2",
+            "repeat": 21
+          },
+          {
+            "at": 80,
+            "count": 1,
+            "every": 19.8,
+            "gap": 0,
+            "mouse": "m13",
+            "repeat": 17
+          },
+          {
+            "at": 330,
+            "count": 3,
+            "gap": 3,
+            "mouse": "m13"
+          },
+          {
+            "at": 335,
+            "count": 2,
+            "gap": 4,
+            "mouse": "m10"
+          },
+          {
+            "at": 0,
+            "count": 3,
+            "gap": 2,
+            "mouse": "m10",
+            "trigger": 70
+          },
+          {
+            "at": 0,
+            "count": 3,
+            "gap": 2.5,
+            "mouse": "m13",
+            "trigger": 40
+          },
+          {
+            "at": 1,
+            "count": 8,
+            "gap": 0.6,
+            "mouse": "m6",
+            "trigger": 40
+          },
+          {
+            "at": 0,
+            "count": 3,
+            "gap": 2,
+            "mouse": "m10",
+            "trigger": 15
+          },
+          {
+            "at": 0,
+            "count": 2,
+            "gap": 4,
+            "mouse": "m13",
+            "trigger": 15
+          }
+        ]
+      },
+      {
+        "base_hp": 4200,
+        "chapter": 1,
+        "description": "盾牌鼠擋在前面，投石鼠在後面丟石頭。",
+        "id": 7,
+        "min_seconds": 45,
+        "name": "盾牌防線",
+        "recommend_level": 11,
+        "reward": 250,
+        "scale": 0.96,
+        "shield_seconds": 0,
+        "tip": "盾牌鼠減少 40% 傷害而且推不動，用攻擊高的虎斑、暹羅劍士；後面的投石鼠用遠程貓處理。",
+        "waves": [
+          {
+            "at": 5,
+            "count": 4,
+            "every": 10.6,
+            "gap": 1,
+            "mouse": "m7",
+            "repeat": 38
+          },
+          {
+            "at": 20,
+            "count": 1,
+            "every": 17.6,
+            "gap": 0,
+            "mouse": "m12",
+            "repeat": 22
+          },
+          {
+            "at": 45,
+            "count": 1,
+            "every": 15.8,
+            "gap": 0,
+            "mouse": "m11",
+            "repeat": 23
+          },
+          {
+            "at": 100,
+            "count": 1,
+            "every": 22,
+            "gap": 0,
+            "mouse": "m9",
+            "repeat": 14
+          },
+          {
+            "at": 330,
+            "count": 2,
+            "gap": 5,
+            "mouse": "m12"
+          },
+          {
+            "at": 335,
+            "count": 2,
+            "gap": 5,
+            "mouse": "m11"
+          },
+          {
+            "at": 340,
+            "count": 12,
+            "gap": 0.6,
+            "mouse": "m7"
+          },
+          {
+            "at": 0,
+            "count": 3,
+            "gap": 2,
+            "mouse": "m9",
+            "trigger": 70
+          },
+          {
+            "at": 0,
+            "count": 3,
+            "gap": 2.5,
+            "mouse": "m12",
+            "trigger": 40
+          },
+          {
+            "at": 1,
+            "count": 8,
+            "gap": 0.6,
+            "mouse": "m7",
+            "trigger": 40
+          },
+          {
+            "at": 0,
+            "count": 3,
+            "gap": 2,
+            "mouse": "m9",
+            "trigger": 15
+          },
+          {
+            "at": 0,
+            "count": 2,
+            "gap": 4,
+            "mouse": "m12",
+            "trigger": 15
+          }
+        ]
+      },
+      {
+        "base_hp": 4700,
+        "chapter": 1,
+        "description": "鼠法師和火箭鼠的範圍攻擊很危險，分散你的貓咪。",
+        "id": 8,
+        "min_seconds": 45,
+        "name": "法師塔",
+        "recommend_level": 12,
+        "reward": 290,
+        "scale": 1.04,
+        "shield_seconds": 0,
+        "tip": "鼠法師和火箭鼠的範圍攻擊很痛，貓咪不要擠在一起，帶緬因巨人當肉盾。",
+        "waves": [
+          {
+            "at": 4,
+            "count": 3,
+            "every": 7.9,
+            "gap": 2,
+            "mouse": "m1",
+            "repeat": 51
+          },
+          {
+            "at": 30,
+            "count": 1,
+            "every": 15.8,
+            "gap": 0,
+            "mouse": "m14",
+            "repeat": 24
+          },
+          {
+            "at": 60,
+            "count": 1,
+            "every": 18.5,
+            "gap": 0,
+            "mouse": "m9",
+            "repeat": 19
+          },
+          {
+            "at": 90,
+            "count": 1,
+            "every": 19.8,
+            "gap": 0,
+            "mouse": "m13",
+            "repeat": 16
+          },
+          {
+            "at": 180,
+            "count": 1,
+            "every": 26.4,
+            "gap": 0,
+            "mouse": "m16",
+            "repeat": 9
+          },
+          {
+            "at": 330,
+            "count": 1,
+            "gap": 0,
+            "mouse": "m16"
+          },
+          {
+            "at": 333,
+            "count": 2,
+            "gap": 4,
+            "mouse": "m14"
+          },
+          {
+            "at": 336,
+            "count": 2,
+            "gap": 3,
+            "mouse": "m13"
+          },
+          {
+            "at": 0,
+            "count": 3,
+            "gap": 2,
+            "mouse": "m9",
+            "trigger": 70
+          },
+          {
+            "at": 0,
+            "count": 3,
+            "gap": 2.5,
+            "mouse": "m16",
+            "trigger": 40
+          },
+          {
+            "at": 1,
+            "count": 8,
+            "gap": 0.6,
+            "mouse": "m1",
+            "trigger": 40
+          },
+          {
+            "at": 0,
+            "count": 3,
+            "gap": 2,
+            "mouse": "m9",
+            "trigger": 15
+          },
+          {
+            "at": 0,
+            "count": 2,
+            "gap": 4,
+            "mouse": "m16",
+            "trigger": 15
+          }
+        ]
+      },
+      {
+        "base_hp": 4800,
+        "chapter": 1,
+        "description": "鼠將軍親自上陣，還帶著機械鼠和暗影鼠。",
+        "id": 9,
+        "min_seconds": 45,
+        "name": "將軍的城牆",
+        "recommend_level": 13,
+        "reward": 330,
+        "scale": 1.08,
+        "shield_seconds": 0,
+        "tip": "鼠將軍會把貓咪擊退，前排放緬因巨人，後面用遠程和範圍攻擊輸出，可以帶「全軍振奮」道具。",
+        "waves": [
+          {
+            "at": 10,
+            "count": 1,
+            "every": 12.3,
+            "gap": 0,
+            "mouse": "m9",
+            "repeat": 32
+          },
+          {
+            "at": 25,
+            "count": 1,
+            "every": 17.6,
+            "gap": 0,
+            "mouse": "m12",
+            "repeat": 22
+          },
+          {
+            "at": 50,
+            "count": 1,
+            "every": 17.6,
+            "gap": 0,
+            "mouse": "m14",
+            "repeat": 20
+          },
+          {
+            "at": 120,
+            "count": 1,
+            "every": 30.8,
+            "gap": 0,
+            "mouse": "m18",
+            "repeat": 10
+          },
+          {
+            "at": 200,
+            "count": 1,
+            "every": 44,
+            "gap": 0,
+            "mouse": "m17",
+            "repeat": 5
+          },
+          {
+            "at": 300,
+            "count": 1,
+            "gap": 0,
+            "mouse": "m15"
+          },
+          {
+            "at": 340,
+            "count": 3,
+            "gap": 3,
+            "mouse": "m9"
+          },
+          {
+            "at": 345,
+            "count": 1,
+            "gap": 0,
+            "mouse": "m18"
+          },
+          {
+            "at": 0,
+            "count": 2,
+            "gap": 2,
+            "mouse": "m18",
+            "trigger": 70
+          },
+          {
+            "at": 0,
+            "count": 2,
+            "gap": 3,
+            "mouse": "m15",
+            "trigger": 40
+          },
+          {
+            "at": 1,
+            "count": 8,
+            "gap": 0.6,
+            "mouse": "m9",
+            "trigger": 40
+          },
+          {
+            "at": 0,
+            "count": 3,
+            "gap": 2,
+            "mouse": "m18",
+            "trigger": 15
+          },
+          {
+            "at": 0,
+            "count": 1,
+            "gap": 0,
+            "mouse": "m15",
+            "trigger": 15
+          }
+        ]
+      },
+      {
+        "base_hp": 5000,
+        "chapter": 1,
+        "description": "地下王國的最深處，鼠大王就坐在起司王座上。打倒牠！",
+        "guard": "m19",
+        "id": 10,
+        "min_seconds": 45,
+        "name": "鼠大王的宮殿",
+        "recommend_level": 15,
+        "reward": 360,
+        "scale": 1.21,
+        "shield_seconds": 0,
+        "tip": "鼠大王的重擊會打到一片貓咪。耐打的前排加上遠程、範圍輸出，記得帶道具，貓爪砲留到牠出場再用。",
+        "waves": [
+          {
+            "at": 5,
+            "count": 6,
+            "every": 11.4,
+            "gap": 0.6,
+            "mouse": "m7",
+            "repeat": 35
+          },
+          {
+            "at": 20,
+            "count": 1,
+            "every": 15,
+            "gap": 0,
+            "mouse": "m9",
+            "repeat": 26
+          },
+          {
+            "at": 40,
+            "count": 1,
+            "every": 17.6,
+            "gap": 0,
+            "mouse": "m11",
+            "repeat": 21
+          },
+          {
+            "at": 120,
+            "count": 1,
+            "every": 30.8,
+            "gap": 0,
+            "mouse": "m16",
+            "repeat": 10
+          },
+          {
+            "at": 160,
+            "count": 1,
+            "every": 30.8,
+            "gap": 0,
+            "mouse": "m18",
+            "repeat": 8
+          },
+          {
+            "at": 220,
+            "count": 1,
+            "gap": 0,
+            "mouse": "m15"
+          },
+          {
+            "at": 280,
+            "count": 1,
+            "gap": 0,
+            "mouse": "m17"
+          },
+          {
+            "at": 330,
+            "count": 1,
+            "gap": 0,
+            "mouse": "m19"
+          },
+          {
+            "at": 340,
+            "count": 20,
+            "gap": 0.5,
+            "mouse": "m7"
+          },
+          {
+            "at": 0,
+            "count": 2,
+            "gap": 2,
+            "mouse": "m15",
+            "trigger": 70
+          },
+          {
+            "at": 0,
+            "count": 2,
+            "gap": 3,
+            "mouse": "m17",
+            "trigger": 40
+          },
+          {
+            "at": 1,
+            "count": 8,
+            "gap": 0.6,
+            "mouse": "m7",
+            "trigger": 40
+          },
+          {
+            "at": 0,
+            "count": 3,
+            "gap": 2,
+            "mouse": "m15",
+            "trigger": 15
+          },
+          {
+            "at": 0,
+            "count": 1,
+            "gap": 0,
+            "mouse": "m17",
+            "trigger": 15
+          },
+          {
+            "at": 0,
+            "count": 1,
+            "gap": 0,
+            "mouse": "m19",
+            "trigger": 40
+          }
+        ]
+      },
+      {
+        "base_hp": 5200,
+        "chapter": 2,
+        "description": "鼠大王倒下後，殘兵逃進了下水道。鼠醫生會替附近的老鼠補血，先打倒牠！",
+        "id": 11,
+        "min_seconds": 45,
+        "name": "下水道的殘黨",
+        "recommend_level": 16,
+        "release": "2026-10-26",
+        "reward": 80,
+        "scale": 3.71,
+        "shield_seconds": 0,
+        "tip": "先集火鼠醫生，牠會一直替旁邊的老鼠補血；成群的吱吱鼠用範圍攻擊清掉。",
+        "waves": [
+          {
+            "at": 5,
+            "count": 5,
+            "every": 13,
+            "gap": 0.6,
+            "mouse": "m7",
+            "repeat": 30
+          },
+          {
+            "at": 20,
+            "count": 1,
+            "every": 16,
+            "gap": 0,
+            "mouse": "m9",
+            "repeat": 24
+          },
+          {
+            "at": 45,
+            "count": 1,
+            "every": 19,
+            "gap": 0,
+            "mouse": "m10",
+            "repeat": 20
+          },
+          {
+            "at": 90,
+            "count": 1,
+            "every": 35,
+            "gap": 0,
+            "mouse": "m23",
+            "repeat": 10
+          },
+          {
+            "at": 300,
+            "count": 1,
+            "gap": 0,
+            "mouse": "m12"
+          },
+          {
+            "at": 330,
+            "count": 3,
+            "gap": 3,
+            "mouse": "m9"
+          },
+          {
+            "at": 0,
+            "count": 1,
+            "gap": 0,
+            "mouse": "m23",
+            "trigger": 70
+          },
+          {
+            "at": 0,
+            "count": 3,
+            "gap": 2,
+            "mouse": "m9",
+            "trigger": 40
+          },
+          {
+            "at": 1,
+            "count": 8,
+            "gap": 0.6,
+            "mouse": "m7",
+            "trigger": 40
+          },
+          {
+            "at": 0,
+            "count": 1,
+            "gap": 0,
+            "mouse": "m12",
+            "trigger": 15
+          },
+          {
+            "at": 0,
+            "count": 2,
+            "gap": 3,
+            "mouse": "m23",
+            "trigger": 15
+          }
+        ]
+      },
+      {
+        "base_hp": 5400,
+        "chapter": 2,
+        "description": "順著地下河追下去。冰霜鼠的吐息會把一片貓咪凍住，別把貓咪擠在一起。",
+        "id": 12,
+        "min_seconds": 45,
+        "name": "冰冷的地下河",
+        "recommend_level": 16,
+        "release": "2026-10-26",
+        "reward": 140,
+        "scale": 1.73,
+        "shield_seconds": 0,
+        "tip": "冰霜鼠會凍住一片貓咪，出兵時錯開，不要全部擠在一起；遠程貓先打冰霜鼠。",
+        "waves": [
+          {
+            "at": 5,
+            "count": 3,
+            "every": 13,
+            "gap": 1,
+            "mouse": "m3",
+            "repeat": 30
+          },
+          {
+            "at": 25,
+            "count": 1,
+            "every": 17,
+            "gap": 0,
+            "mouse": "m13",
+            "repeat": 22
+          },
+          {
+            "at": 60,
+            "count": 1,
+            "every": 20,
+            "gap": 0,
+            "mouse": "m14",
+            "repeat": 18
+          },
+          {
+            "at": 120,
+            "count": 1,
+            "every": 40,
+            "gap": 0,
+            "mouse": "m24",
+            "repeat": 8
+          },
+          {
+            "at": 320,
+            "count": 1,
+            "gap": 0,
+            "mouse": "m24"
+          },
+          {
+            "at": 330,
+            "count": 3,
+            "gap": 2,
+            "mouse": "m13"
+          },
+          {
+            "at": 0,
+            "count": 2,
+            "gap": 2,
+            "mouse": "m13",
+            "trigger": 70
+          },
+          {
+            "at": 0,
+            "count": 1,
+            "gap": 0,
+            "mouse": "m24",
+            "trigger": 40
+          },
+          {
+            "at": 1,
+            "count": 8,
+            "gap": 0.6,
+            "mouse": "m3",
+            "trigger": 40
+          },
+          {
+            "at": 0,
+            "count": 1,
+            "gap": 0,
+            "mouse": "m24",
+            "trigger": 15
+          },
+          {
+            "at": 0,
+            "count": 3,
+            "gap": 2,
+            "mouse": "m13",
+            "trigger": 15
+          }
+        ]
+      },
+      {
+        "base_hp": 5600,
+        "chapter": 2,
+        "description": "老鼠躲進廢棄的遊樂園，南瓜炸彈鼠從旋轉木馬上丟下會爆炸的南瓜燈。",
+        "id": 13,
+        "min_seconds": 45,
+        "name": "廢棄遊樂園",
+        "recommend_level": 17,
+        "release": "2026-10-26",
+        "reward": 220,
+        "scale": 1.33,
+        "shield_seconds": 0,
+        "tip": "南瓜炸彈鼠和火箭鼠都是範圍爆炸，貓咪分散；盾牌鼠用高攻擊或穿透處理。",
+        "waves": [
+          {
+            "at": 5,
+            "count": 3,
+            "every": 13,
+            "gap": 1.2,
+            "mouse": "m6",
+            "repeat": 30
+          },
+          {
+            "at": 30,
+            "count": 1,
+            "every": 19,
+            "gap": 0,
+            "mouse": "m22",
+            "repeat": 20
+          },
+          {
+            "at": 60,
+            "count": 1,
+            "every": 22,
+            "gap": 0,
+            "mouse": "m12",
+            "repeat": 16
+          },
+          {
+            "at": 150,
+            "count": 1,
+            "every": 40,
+            "gap": 0,
+            "mouse": "m16",
+            "repeat": 7
+          },
+          {
+            "at": 320,
+            "count": 3,
+            "gap": 2,
+            "mouse": "m22"
+          },
+          {
+            "at": 0,
+            "count": 2,
+            "gap": 2,
+            "mouse": "m22",
+            "trigger": 70
+          },
+          {
+            "at": 0,
+            "count": 1,
+            "gap": 0,
+            "mouse": "m16",
+            "trigger": 40
+          },
+          {
+            "at": 1,
+            "count": 8,
+            "gap": 0.6,
+            "mouse": "m6",
+            "trigger": 40
+          },
+          {
+            "at": 0,
+            "count": 2,
+            "gap": 3,
+            "mouse": "m16",
+            "trigger": 15
+          }
+        ]
+      },
+      {
+        "base_hp": 5800,
+        "chapter": 2,
+        "description": "鐘錶鼠守著鐘塔，每轉一次發條，貓咪就被推回去定住。盾牌鼠擋在前面。",
+        "id": 14,
+        "min_seconds": 45,
+        "name": "停止的鐘塔",
+        "recommend_level": 17,
+        "release": "2026-10-26",
+        "reward": 300,
+        "scale": 1.66,
+        "shield_seconds": 0,
+        "tip": "鐘錶鼠每 10 秒會把附近的貓推回去並定住，用遠程貓在牠範圍外攻擊，趁倒轉之間推進。",
+        "waves": [
+          {
+            "at": 5,
+            "count": 4,
+            "every": 13,
+            "gap": 0.8,
+            "mouse": "m1",
+            "repeat": 30
+          },
+          {
+            "at": 20,
+            "count": 1,
+            "every": 18,
+            "gap": 0,
+            "mouse": "m12",
+            "repeat": 22
+          },
+          {
+            "at": 50,
+            "count": 1,
+            "every": 21,
+            "gap": 0,
+            "mouse": "m11",
+            "repeat": 18
+          },
+          {
+            "at": 120,
+            "count": 1,
+            "every": 50,
+            "gap": 0,
+            "mouse": "m25",
+            "repeat": 6
+          },
+          {
+            "at": 300,
+            "count": 1,
+            "gap": 0,
+            "mouse": "m17"
+          },
+          {
+            "at": 0,
+            "count": 1,
+            "gap": 0,
+            "mouse": "m25",
+            "trigger": 70
+          },
+          {
+            "at": 0,
+            "count": 2,
+            "gap": 3,
+            "mouse": "m12",
+            "trigger": 40
+          },
+          {
+            "at": 1,
+            "count": 8,
+            "gap": 0.6,
+            "mouse": "m1",
+            "trigger": 40
+          },
+          {
+            "at": 0,
+            "count": 1,
+            "gap": 0,
+            "mouse": "m25",
+            "trigger": 15
+          },
+          {
+            "at": 0,
+            "count": 1,
+            "gap": 0,
+            "mouse": "m17",
+            "trigger": 15
+          }
+        ]
+      },
+      {
+        "base_hp": 6000,
+        "chapter": 2,
+        "description": "幽靈鼠在墓碑之間飄來飄去。鼠大王的哥哥——鼠鬼王，被吵醒了。",
+        "id": 15,
+        "min_seconds": 45,
+        "name": "月夜墓園",
+        "recommend_level": 18,
+        "release": "2026-10-26",
+        "reward": 360,
+        "scale": 2.4,
+        "shield_seconds": 0,
+        "tip": "幽靈鼠有 45% 閃避，範圍攻擊和必中的雷擊最有效。鼠鬼王有怒氣條：一直冰凍、推牠會暴怒、震暈旁邊的貓，控場留給小怪，打頭目靠爆擊和高攻擊。",
+        "waves": [
+          {
+            "at": 20,
+            "count": 1,
+            "every": 13,
+            "gap": 1.5,
+            "mouse": "m21",
+            "repeat": 28
+          },
+          {
+            "at": 30,
+            "count": 1,
+            "every": 19,
+            "gap": 0,
+            "mouse": "m9",
+            "repeat": 20
+          },
+          {
+            "at": 60,
+            "count": 1,
+            "every": 35,
+            "gap": 0,
+            "mouse": "m23",
+            "repeat": 10
+          },
+          {
+            "at": 150,
+            "count": 1,
+            "every": 40,
+            "gap": 0,
+            "mouse": "m18",
+            "repeat": 6
+          },
+          {
+            "at": 320,
+            "count": 1,
+            "gap": 0,
+            "mouse": "m27",
+            "traits": [
+              "rage"
+            ]
+          },
+          {
+            "at": 330,
+            "count": 6,
+            "gap": 0.8,
+            "mouse": "m21"
+          },
+          {
+            "at": 0,
+            "count": 4,
+            "gap": 1,
+            "mouse": "m21",
+            "trigger": 70
+          },
+          {
+            "at": 0,
+            "count": 2,
+            "gap": 3,
+            "mouse": "m18",
+            "trigger": 40
+          },
+          {
+            "at": 1,
+            "count": 6,
+            "gap": 0.6,
+            "mouse": "m21",
+            "trigger": 40
+          },
+          {
+            "at": 0,
+            "count": 2,
+            "gap": 2,
+            "mouse": "m23",
+            "trigger": 15
+          },
+          {
+            "at": 0,
+            "count": 1,
+            "gap": 0,
+            "mouse": "m18",
+            "trigger": 15
+          }
+        ]
+      },
+      {
+        "base_hp": 6200,
+        "chapter": 2,
+        "description": "雷電鼠在山頂召喚閃電，整片戰場的貓咪都會被劈到。鼠將軍也趕來了。",
+        "id": 16,
+        "min_seconds": 45,
+        "name": "雷雨山谷",
+        "recommend_level": 19,
+        "release": "2026-10-26",
+        "reward": 440,
+        "scale": 0.94,
+        "shield_seconds": 0,
+        "tip": "雷電鼠一次打中所有貓咪，帶血多的貓和布偶護士補血，盡快打掉雷電鼠。",
+        "waves": [
+          {
+            "at": 5,
+            "count": 2,
+            "every": 13,
+            "gap": 2,
+            "mouse": "m2",
+            "repeat": 30
+          },
+          {
+            "at": 25,
+            "count": 1,
+            "every": 17,
+            "gap": 0,
+            "mouse": "m9",
+            "repeat": 22
+          },
+          {
+            "at": 50,
+            "count": 1,
+            "every": 20,
+            "gap": 0,
+            "mouse": "m11",
+            "repeat": 18
+          },
+          {
+            "at": 120,
+            "count": 1,
+            "every": 40,
+            "gap": 0,
+            "mouse": "m26",
+            "repeat": 8
+          },
+          {
+            "at": 300,
+            "count": 1,
+            "gap": 0,
+            "mouse": "m15"
+          },
+          {
+            "at": 0,
+            "count": 1,
+            "gap": 0,
+            "mouse": "m26",
+            "trigger": 70
+          },
+          {
+            "at": 0,
+            "count": 3,
+            "gap": 2,
+            "mouse": "m9",
+            "trigger": 40
+          },
+          {
+            "at": 1,
+            "count": 6,
+            "gap": 0.8,
+            "mouse": "m2",
+            "trigger": 40
+          },
+          {
+            "at": 0,
+            "count": 2,
+            "gap": 3,
+            "mouse": "m26",
+            "trigger": 15
+          }
+        ]
+      },
+      {
+        "base_hp": 6400,
+        "chapter": 2,
+        "description": "鼴鼠從滾燙的地底鑽出來，機械鼠和冰霜鼠守著礦坑的出口。",
+        "id": 17,
+        "min_seconds": 45,
+        "name": "熔岩礦坑",
+        "recommend_level": 19,
+        "release": "2026-10-26",
+        "reward": 500,
+        "scale": 1.49,
+        "shield_seconds": 0,
+        "tip": "鼴鼠從中間鑽出、機械鼠很硬，前排要耐打，後排用高攻擊；冰霜鼠出現時分散站位。",
+        "waves": [
+          {
+            "at": 5,
+            "count": 3,
+            "every": 13,
+            "gap": 1,
+            "mouse": "m5",
+            "repeat": 30
+          },
+          {
+            "at": 25,
+            "count": 1,
+            "every": 17,
+            "gap": 0,
+            "mouse": "m8",
+            "repeat": 22
+          },
+          {
+            "at": 60,
+            "count": 1,
+            "every": 45,
+            "gap": 0,
+            "mouse": "m17",
+            "repeat": 8
+          },
+          {
+            "at": 120,
+            "count": 1,
+            "every": 45,
+            "gap": 0,
+            "mouse": "m24",
+            "repeat": 7
+          },
+          {
+            "at": 320,
+            "count": 2,
+            "gap": 4,
+            "mouse": "m17"
+          },
+          {
+            "at": 0,
+            "count": 3,
+            "gap": 2,
+            "mouse": "m8",
+            "trigger": 70
+          },
+          {
+            "at": 0,
+            "count": 1,
+            "gap": 0,
+            "mouse": "m24",
+            "trigger": 40
+          },
+          {
+            "at": 1,
+            "count": 8,
+            "gap": 0.6,
+            "mouse": "m5",
+            "trigger": 40
+          },
+          {
+            "at": 0,
+            "count": 1,
+            "gap": 0,
+            "mouse": "m17",
+            "trigger": 15
+          },
+          {
+            "at": 0,
+            "count": 1,
+            "gap": 0,
+            "mouse": "m24",
+            "trigger": 15
+          }
+        ]
+      },
+      {
+        "base_hp": 6600,
+        "chapter": 2,
+        "description": "神殿大門前，會補血、會冰凍、會倒轉時間的老鼠一起出動。",
+        "id": 18,
+        "min_seconds": 45,
+        "name": "鼠神殿的大門",
+        "recommend_level": 20,
+        "release": "2026-10-26",
+        "reward": 580,
+        "scale": 1.16,
+        "shield_seconds": 0,
+        "tip": "補血、冰凍、時間倒轉的老鼠會一起出現。優先打鼠醫生，再處理冰霜鼠和鐘錶鼠。",
+        "waves": [
+          {
+            "at": 5,
+            "count": 6,
+            "every": 13,
+            "gap": 0.5,
+            "mouse": "m7",
+            "repeat": 30
+          },
+          {
+            "at": 20,
+            "count": 1,
+            "every": 18,
+            "gap": 0,
+            "mouse": "m12",
+            "repeat": 22
+          },
+          {
+            "at": 45,
+            "count": 1,
+            "every": 30,
+            "gap": 0,
+            "mouse": "m23",
+            "repeat": 12
+          },
+          {
+            "at": 100,
+            "count": 1,
+            "every": 45,
+            "gap": 0,
+            "mouse": "m24",
+            "repeat": 7
+          },
+          {
+            "at": 160,
+            "count": 1,
+            "every": 55,
+            "gap": 0,
+            "mouse": "m25",
+            "repeat": 5
+          },
+          {
+            "at": 320,
+            "count": 1,
+            "gap": 0,
+            "mouse": "m15"
+          },
+          {
+            "at": 0,
+            "count": 2,
+            "gap": 2,
+            "mouse": "m23",
+            "trigger": 70
+          },
+          {
+            "at": 0,
+            "count": 2,
+            "gap": 3,
+            "mouse": "m12",
+            "trigger": 40
+          },
+          {
+            "at": 1,
+            "count": 10,
+            "gap": 0.5,
+            "mouse": "m7",
+            "trigger": 40
+          },
+          {
+            "at": 0,
+            "count": 1,
+            "gap": 0,
+            "mouse": "m25",
+            "trigger": 15
+          },
+          {
+            "at": 0,
+            "count": 1,
+            "gap": 0,
+            "mouse": "m15",
+            "trigger": 15
+          }
+        ]
+      },
+      {
+        "base_hp": 4800,
+        "chapter": 2,
+        "description": "伸手不見五指的回廊，暗影鼠、雷電鼠和鼠鬼王在黑暗中等著。",
+        "id": 19,
+        "min_seconds": 45,
+        "name": "黑暗回廊",
+        "recommend_level": 20,
+        "release": "2026-10-26",
+        "reward": 660,
+        "scale": 0.6,
+        "shield_seconds": 0,
+        "tip": "暗影鼠會閃避、雷電鼠打全場，鼠鬼王第 220 秒出場前先把小怪清乾淨。鼠鬼王有怒氣條，冰凍和推擠太多次會讓牠暴怒，貓爪砲留給頭目。",
+        "waves": [
+          {
+            "at": 5,
+            "count": 3,
+            "every": 13,
+            "gap": 1,
+            "mouse": "m21",
+            "repeat": 30
+          },
+          {
+            "at": 25,
+            "count": 1,
+            "every": 26,
+            "gap": 0,
+            "mouse": "m18",
+            "repeat": 14
+          },
+          {
+            "at": 60,
+            "count": 1,
+            "every": 38,
+            "gap": 0,
+            "mouse": "m26",
+            "repeat": 9
+          },
+          {
+            "at": 120,
+            "count": 1,
+            "every": 50,
+            "gap": 0,
+            "mouse": "m25",
+            "repeat": 6
+          },
+          {
+            "at": 220,
+            "count": 1,
+            "gap": 0,
+            "mouse": "m27",
+            "traits": [
+              "rage"
+            ]
+          },
+          {
+            "at": 0,
+            "count": 2,
+            "gap": 2,
+            "mouse": "m18",
+            "trigger": 70
+          },
+          {
+            "at": 0,
+            "count": 2,
+            "gap": 3,
+            "mouse": "m26",
+            "trigger": 40
+          },
+          {
+            "at": 1,
+            "count": 8,
+            "gap": 0.6,
+            "mouse": "m21",
+            "trigger": 40
+          },
+          {
+            "at": 0,
+            "count": 1,
+            "gap": 0,
+            "mouse": "m27",
+            "traits": [
+              "rage"
+            ],
+            "trigger": 15
+          }
+        ]
+      },
+      {
+        "base_hp": 7000,
+        "chapter": 2,
+        "description": "鼠族的始祖——終焉鼠神在祭壇上甦醒。打倒牠！可是牠倒下的那一刻，身體碎成了八塊發光的碎片，飛向遠方……",
+        "guard": "m20",
+        "id": 20,
+        "min_seconds": 45,
+        "name": "終焉祭壇",
+        "recommend_level": 21,
+        "release": "2026-10-26",
+        "reward": 720,
+        "scale": 0.42,
+        "shield_seconds": 0,
+        "tip": "終焉鼠神每 12 秒召喚鼠群，範圍攻擊清小怪、耐打的前排擋住頭目。牠和鼠鬼王都有怒氣條，一直冰凍會讓牠們暴怒，所有道具都帶上。",
+        "waves": [
+          {
+            "at": 5,
+            "count": 6,
+            "every": 11,
+            "gap": 0.5,
+            "mouse": "m7",
+            "repeat": 35
+          },
+          {
+            "at": 20,
+            "count": 1,
+            "every": 15,
+            "gap": 0,
+            "mouse": "m9",
+            "repeat": 26
+          },
+          {
+            "at": 45,
+            "count": 1,
+            "every": 30,
+            "gap": 0,
+            "mouse": "m23",
+            "repeat": 12
+          },
+          {
+            "at": 100,
+            "count": 1,
+            "every": 40,
+            "gap": 0,
+            "mouse": "m24",
+            "repeat": 8
+          },
+          {
+            "at": 150,
+            "count": 1,
+            "every": 45,
+            "gap": 0,
+            "mouse": "m26",
+            "repeat": 7
+          },
+          {
+            "at": 200,
+            "count": 1,
+            "every": 50,
+            "gap": 0,
+            "mouse": "m25",
+            "repeat": 5
+          },
+          {
+            "at": 330,
+            "count": 1,
+            "gap": 0,
+            "mouse": "m20",
+            "traits": [
+              "rage"
+            ]
+          },
+          {
+            "at": 340,
+            "count": 20,
+            "gap": 0.5,
+            "mouse": "m7"
+          },
+          {
+            "at": 0,
+            "count": 1,
+            "gap": 0,
+            "mouse": "m27",
+            "traits": [
+              "rage"
+            ],
+            "trigger": 70
+          },
+          {
+            "at": 0,
+            "count": 2,
+            "gap": 3,
+            "mouse": "m17",
+            "trigger": 40
+          },
+          {
+            "at": 1,
+            "count": 8,
+            "gap": 0.6,
+            "mouse": "m7",
+            "trigger": 40
+          },
+          {
+            "at": 0,
+            "count": 1,
+            "gap": 0,
+            "mouse": "m19",
+            "trigger": 15
+          },
+          {
+            "at": 0,
+            "count": 2,
+            "gap": 2,
+            "mouse": "m23",
+            "trigger": 15
+          },
+          {
+            "at": 0,
+            "count": 1,
+            "gap": 0,
+            "mouse": "m20",
+            "traits": [
+              "rage"
+            ],
+            "trigger": 40
+          }
+        ]
+      }
+    ]
+  },
+  "endlessMeta": {
+    "ends": "2026-11-01",
+    "season": "2026-10-26"
+  },
+  "schemaVersion": 1,
+  "source": "https://api.ilovecat520.me/playground/battle",
+  "stage": {
+    "base_hp": 99999999,
+    "description": "老鼠一輪比一輪強，要塞打不倒。撐越久分數越高，每週一重新排名，每週的戰場效果都不一樣。",
+    "id": 9101,
+    "look": 10,
+    "min_seconds": 0,
+    "modifier": "gravity",
+    "name": "無盡模式",
+    "reward": 0,
+    "scale": 1,
+    "shield_seconds": 0,
+    "time_limit": 900,
+    "tip": "精英和頭目有怒氣條：一直被冰凍、推擠會暴怒，暫時不怕控場還會震暈旁邊的貓。帶火焰標記的老鼠不怕冰。",
+    "waves": [
+      {
+        "at": 5,
+        "count": 3,
+        "gap": 0.7,
+        "mouse": "m1",
+        "scale": 1
+      },
+      {
+        "at": 11,
+        "count": 1,
+        "gap": 1.2,
+        "mouse": "m5",
+        "scale": 1
+      },
+      {
+        "at": 20,
+        "count": 3,
+        "gap": 0.7,
+        "mouse": "m1",
+        "scale": 1.08
+      },
+      {
+        "at": 26,
+        "count": 1,
+        "gap": 1.2,
+        "mouse": "m6",
+        "scale": 1.08
+      },
+      {
+        "at": 35,
+        "count": 3,
+        "gap": 0.7,
+        "mouse": "m1",
+        "scale": 1.16
+      },
+      {
+        "at": 41,
+        "count": 1,
+        "gap": 1.2,
+        "mouse": "m8",
+        "scale": 1.16
+      },
+      {
+        "at": 50,
+        "count": 3,
+        "gap": 0.7,
+        "mouse": "m1",
+        "scale": 1.25
+      },
+      {
+        "at": 56,
+        "count": 1,
+        "gap": 1.2,
+        "mouse": "m9",
+        "scale": 1.25
+      },
+      {
+        "at": 65,
+        "count": 3,
+        "gap": 0.7,
+        "mouse": "m1",
+        "scale": 1.35
+      },
+      {
+        "at": 71,
+        "count": 1,
+        "gap": 1.2,
+        "mouse": "m10",
+        "scale": 1.35
+      },
+      {
+        "at": 80,
+        "count": 3,
+        "gap": 0.7,
+        "mouse": "m1",
+        "scale": 1.45
+      },
+      {
+        "at": 86,
+        "count": 1,
+        "gap": 1.2,
+        "mouse": "m11",
+        "scale": 1.45
+      },
+      {
+        "at": 94,
+        "count": 1,
+        "gap": 1.5,
+        "mouse": "m10",
+        "scale": 1.45
+      },
+      {
+        "at": 95,
+        "count": 4,
+        "gap": 0.7,
+        "mouse": "m1",
+        "scale": 1.56
+      },
+      {
+        "at": 101,
+        "count": 1,
+        "gap": 1.2,
+        "mouse": "m12",
+        "scale": 1.56
+      },
+      {
+        "at": 125,
+        "count": 4,
+        "gap": 0.7,
+        "mouse": "m1",
+        "scale": 1.81
+      },
+      {
+        "at": 131,
+        "count": 1,
+        "gap": 1.2,
+        "mouse": "m13",
+        "scale": 1.81
+      },
+      {
+        "at": 145,
+        "count": 1,
+        "gap": 3,
+        "mouse": "m18",
+        "scale": 1.81
+      },
+      {
+        "at": 155,
+        "count": 4,
+        "gap": 0.7,
+        "mouse": "m1",
+        "scale": 2.1
+      },
+      {
+        "at": 161,
+        "count": 1,
+        "gap": 1.2,
+        "mouse": "m14",
+        "scale": 2.1
+      },
+      {
+        "at": 169,
+        "count": 1,
+        "gap": 1.5,
+        "mouse": "m13",
+        "scale": 2.1
+      },
+      {
+        "at": 185,
+        "count": 5,
+        "gap": 0.7,
+        "mouse": "m1",
+        "scale": 2.44
+      },
+      {
+        "at": 191,
+        "count": 2,
+        "gap": 1.2,
+        "mouse": "m2",
+        "scale": 2.44
+      },
+      {
+        "at": 215,
+        "count": 5,
+        "gap": 0.7,
+        "mouse": "m1",
+        "scale": 2.83
+      },
+      {
+        "at": 221,
+        "count": 2,
+        "gap": 1.2,
+        "mouse": "m3",
+        "scale": 2.83
+      },
+      {
+        "at": 245,
+        "count": 5,
+        "gap": 0.7,
+        "mouse": "m1",
+        "scale": 3.28
+      },
+      {
+        "at": 251,
+        "count": 2,
+        "gap": 1.2,
+        "mouse": "m4",
+        "scale": 3.28
+      },
+      {
+        "at": 259,
+        "count": 2,
+        "gap": 1.5,
+        "mouse": "m3",
+        "scale": 3.28
+      },
+      {
+        "at": 275,
+        "count": 6,
+        "gap": 0.7,
+        "mouse": "m1",
+        "scale": 3.8
+      },
+      {
+        "at": 281,
+        "count": 2,
+        "gap": 1.2,
+        "mouse": "m5",
+        "scale": 3.8
+      },
+      {
+        "at": 295,
+        "count": 1,
+        "gap": 3,
+        "mouse": "m15",
+        "scale": 3.8,
+        "traits": [
+          "rage"
+        ]
+      },
+      {
+        "at": 305,
+        "count": 6,
+        "gap": 0.7,
+        "mouse": "m1",
+        "scale": 4.41
+      },
+      {
+        "at": 311,
+        "count": 2,
+        "gap": 1.2,
+        "mouse": "m6",
+        "scale": 4.41
+      },
+      {
+        "at": 335,
+        "count": 6,
+        "gap": 0.7,
+        "mouse": "m1",
+        "scale": 5.12
+      },
+      {
+        "at": 341,
+        "count": 2,
+        "gap": 1.2,
+        "mouse": "m8",
+        "scale": 5.12
+      },
+      {
+        "at": 349,
+        "count": 2,
+        "gap": 1.5,
+        "mouse": "m6",
+        "scale": 5.12
+      },
+      {
+        "at": 365,
+        "count": 7,
+        "gap": 0.7,
+        "mouse": "m1",
+        "scale": 5.94
+      },
+      {
+        "at": 371,
+        "count": 3,
+        "gap": 1.2,
+        "mouse": "m9",
+        "scale": 5.94
+      },
+      {
+        "at": 395,
+        "count": 7,
+        "gap": 0.7,
+        "mouse": "m1",
+        "scale": 6.89
+      },
+      {
+        "at": 401,
+        "count": 3,
+        "gap": 1.2,
+        "mouse": "m10",
+        "scale": 6.89,
+        "traits": [
+          "frostproof"
+        ]
+      },
+      {
+        "at": 425,
+        "count": 7,
+        "gap": 0.7,
+        "mouse": "m1",
+        "scale": 7.99
+      },
+      {
+        "at": 431,
+        "count": 3,
+        "gap": 1.2,
+        "mouse": "m11",
+        "scale": 7.99
+      },
+      {
+        "at": 439,
+        "count": 2,
+        "gap": 1.5,
+        "mouse": "m10",
+        "scale": 7.99
+      },
+      {
+        "at": 445,
+        "count": 1,
+        "gap": 3,
+        "mouse": "m16",
+        "scale": 7.99,
+        "traits": [
+          "rage"
+        ]
+      },
+      {
+        "at": 455,
+        "count": 8,
+        "gap": 0.7,
+        "mouse": "m1",
+        "scale": 9.27
+      },
+      {
+        "at": 461,
+        "count": 3,
+        "gap": 1.2,
+        "mouse": "m12",
+        "scale": 9.27,
+        "traits": [
+          "frostproof"
+        ]
+      },
+      {
+        "at": 485,
+        "count": 8,
+        "gap": 0.7,
+        "mouse": "m1",
+        "scale": 10.75
+      },
+      {
+        "at": 491,
+        "count": 3,
+        "gap": 1.2,
+        "mouse": "m13",
+        "scale": 10.75
+      },
+      {
+        "at": 515,
+        "count": 8,
+        "gap": 0.7,
+        "mouse": "m1",
+        "scale": 12.47
+      },
+      {
+        "at": 521,
+        "count": 3,
+        "gap": 1.2,
+        "mouse": "m14",
+        "scale": 12.47,
+        "traits": [
+          "frostproof"
+        ]
+      },
+      {
+        "at": 529,
+        "count": 3,
+        "gap": 1.5,
+        "mouse": "m13",
+        "scale": 12.47,
+        "traits": [
+          "frostproof"
+        ]
+      },
+      {
+        "at": 545,
+        "count": 9,
+        "gap": 0.7,
+        "mouse": "m1",
+        "scale": 14.46
+      },
+      {
+        "at": 551,
+        "count": 4,
+        "gap": 1.2,
+        "mouse": "m2",
+        "scale": 14.46
+      },
+      {
+        "at": 575,
+        "count": 9,
+        "gap": 0.7,
+        "mouse": "m1",
+        "scale": 16.78
+      },
+      {
+        "at": 581,
+        "count": 4,
+        "gap": 1.2,
+        "mouse": "m3",
+        "scale": 16.78,
+        "traits": [
+          "frostproof"
+        ]
+      },
+      {
+        "at": 595,
+        "count": 2,
+        "gap": 3,
+        "mouse": "m17",
+        "scale": 16.78,
+        "traits": [
+          "rage"
+        ]
+      },
+      {
+        "at": 605,
+        "count": 9,
+        "gap": 0.7,
+        "mouse": "m1",
+        "scale": 19.46
+      },
+      {
+        "at": 611,
+        "count": 4,
+        "gap": 1.2,
+        "mouse": "m4",
+        "scale": 19.46
+      },
+      {
+        "at": 619,
+        "count": 3,
+        "gap": 1.5,
+        "mouse": "m3",
+        "scale": 19.46
+      },
+      {
+        "at": 635,
+        "count": 10,
+        "gap": 0.7,
+        "mouse": "m1",
+        "scale": 23.35
+      },
+      {
+        "at": 641,
+        "count": 4,
+        "gap": 1.2,
+        "mouse": "m5",
+        "scale": 23.35,
+        "traits": [
+          "frostproof"
+        ]
+      },
+      {
+        "at": 665,
+        "count": 10,
+        "gap": 0.7,
+        "mouse": "m1",
+        "scale": 28.02
+      },
+      {
+        "at": 671,
+        "count": 4,
+        "gap": 1.2,
+        "mouse": "m6",
+        "scale": 28.02
+      },
+      {
+        "at": 695,
+        "count": 10,
+        "gap": 0.7,
+        "mouse": "m1",
+        "scale": 33.63
+      },
+      {
+        "at": 701,
+        "count": 4,
+        "gap": 1.2,
+        "mouse": "m8",
+        "scale": 33.63,
+        "traits": [
+          "frostproof"
+        ]
+      },
+      {
+        "at": 709,
+        "count": 3,
+        "gap": 1.5,
+        "mouse": "m6",
+        "scale": 33.63,
+        "traits": [
+          "frostproof"
+        ]
+      },
+      {
+        "at": 725,
+        "count": 11,
+        "gap": 0.7,
+        "mouse": "m1",
+        "scale": 40.35
+      },
+      {
+        "at": 731,
+        "count": 5,
+        "gap": 1.2,
+        "mouse": "m9",
+        "scale": 40.35
+      },
+      {
+        "at": 745,
+        "count": 2,
+        "gap": 3,
+        "mouse": "m18",
+        "scale": 40.35,
+        "traits": [
+          "rage"
+        ]
+      },
+      {
+        "at": 755,
+        "count": 11,
+        "gap": 0.7,
+        "mouse": "m1",
+        "scale": 48.42
+      },
+      {
+        "at": 761,
+        "count": 5,
+        "gap": 1.2,
+        "mouse": "m10",
+        "scale": 48.42,
+        "traits": [
+          "frostproof"
+        ]
+      },
+      {
+        "at": 785,
+        "count": 11,
+        "gap": 0.7,
+        "mouse": "m1",
+        "scale": 58.11
+      },
+      {
+        "at": 791,
+        "count": 5,
+        "gap": 1.2,
+        "mouse": "m11",
+        "scale": 58.11
+      },
+      {
+        "at": 799,
+        "count": 4,
+        "gap": 1.5,
+        "mouse": "m10",
+        "scale": 58.11
+      },
+      {
+        "at": 815,
+        "count": 12,
+        "gap": 0.7,
+        "mouse": "m1",
+        "scale": 69.73
+      },
+      {
+        "at": 821,
+        "count": 5,
+        "gap": 1.2,
+        "mouse": "m12",
+        "scale": 69.73,
+        "traits": [
+          "frostproof"
+        ]
+      },
+      {
+        "at": 845,
+        "count": 12,
+        "gap": 0.7,
+        "mouse": "m1",
+        "scale": 83.68
+      },
+      {
+        "at": 851,
+        "count": 5,
+        "gap": 1.2,
+        "mouse": "m13",
+        "scale": 83.68
+      },
+      {
+        "at": 875,
+        "count": 12,
+        "gap": 0.7,
+        "mouse": "m1",
+        "scale": 100.41
+      },
+      {
+        "at": 881,
+        "count": 5,
+        "gap": 1.2,
+        "mouse": "m14",
+        "scale": 100.41,
+        "traits": [
+          "frostproof"
+        ]
+      },
+      {
+        "at": 889,
+        "count": 4,
+        "gap": 1.5,
+        "mouse": "m13",
+        "scale": 100.41,
+        "traits": [
+          "frostproof"
+        ]
+      },
+      {
+        "at": 895,
+        "count": 2,
+        "gap": 3,
+        "mouse": "m15",
+        "scale": 100.41,
+        "traits": [
+          "rage"
+        ]
+      },
+      {
+        "at": 447,
+        "count": 1,
+        "gap": 0,
+        "mouse": "m19",
+        "scale": 7.99,
+        "traits": [
+          "rage"
+        ]
+      },
+      {
+        "at": 777,
+        "count": 1,
+        "gap": 0,
+        "mouse": "m20",
+        "scale": 48.42,
+        "traits": [
+          "rage"
+        ]
+      }
+    ]
+  }
+}
