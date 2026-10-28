@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         喵喵的逆袭 · 数据导出与策略执行
 // @namespace    https://github.com/ZeroJehovah/ilovecat-battle-sim
-// @version      0.1.1
+// @version      0.1.2
 // @description  只读导出战斗数据与当前 JS，并按 JSON 策略操作战斗页面
 // @match        https://api.ilovecat520.me/*
 // @grant        none
@@ -494,6 +494,7 @@
     policy.openers = stringArray(policy.openers ?? [], "policy.openers");
     policy.priority = stringArray(policy.priority ?? [], "policy.priority");
     policy.fallbackPriority = stringArray(policy.fallbackPriority ?? [], "policy.fallbackPriority");
+    policy.deploySequence = repeatedStringArray(policy.deploySequence ?? [], "policy.deploySequence");
     policy.fallbackAfter = policy.fallbackAfter == null
       ? Number.POSITIVE_INFINITY
       : finiteNumber(policy.fallbackAfter, "policy.fallbackAfter");
@@ -530,6 +531,7 @@
       ...policy.openers,
       ...policy.priority,
       ...policy.fallbackPriority,
+      ...policy.deploySequence,
       ...Object.keys(policy.targetCounts),
       ...policy.actions.map((action) => action.id).filter(Boolean),
     ];
@@ -546,6 +548,13 @@
       throw new Error(`${label} 必须是字符串数组。`);
     }
     return [...new Set(value)];
+  }
+
+  function repeatedStringArray(value, label) {
+    if (!Array.isArray(value) || value.some((item) => typeof item !== "string")) {
+      throw new Error(`${label} 必须是字符串数组。`);
+    }
+    return value.map((item) => item.trim()).filter(Boolean);
   }
 
   function clampInt(value, min, max, label) {
@@ -590,6 +599,7 @@
       ...policy.openers,
       ...policy.priority,
       ...policy.fallbackPriority,
+      ...policy.deploySequence,
       ...Object.keys(policy.targetCounts),
       ...policy.actions.map((action) => action.id).filter(Boolean),
     ]);
@@ -637,6 +647,7 @@
       policy: strategy.policy,
       context: runtime.context,
       actionIndex: 0,
+      sequenceIndex: 0,
       opened: new Set(),
       nextActionAt: 0,
       lastStatus: "",
@@ -748,6 +759,18 @@
     }
 
     const counts = snapshot.onField ?? {};
+    if (snapshot.walletLevel >= policy.walletTarget || !policy.economyFirst) {
+      if (executor.sequenceIndex < policy.deploySequence.length) {
+        const id = policy.deploySequence[executor.sequenceIndex];
+        const outcome = tryDeploy(id, snapshot, context);
+        if (outcome === "page") return true;
+        if (outcome === true) {
+          executor.sequenceIndex++;
+          return true;
+        }
+        return policy.autoCannon && snapshot.cannon >= CANNON_READY ? clickCannon() : false;
+      }
+    }
     for (const id of policy.priority) {
       if ((counts[id] ?? 0) < (policy.targetCounts[id] ?? 0)) {
         const outcome = tryDeploy(id, snapshot, context);
@@ -844,7 +867,10 @@
     const counts = policy.priority
       .map((id) => `${id}:${snapshot.onField?.[id] ?? 0}/${policy.targetCounts[id] ?? 0}`)
       .join(" ");
-    const status = `运行中 t=${snapshot.time.toFixed(2)}s  钱包 ${snapshot.walletLevel}/${policy.walletTarget}  金币 ${Math.floor(snapshot.money)}  场上 ${snapshot.cats}/20\n${counts}`;
+    const sequence = policy.deploySequence.length
+      ? `  序列 ${executor.sequenceIndex}/${policy.deploySequence.length}`
+      : "";
+    const status = `运行中 t=${snapshot.time.toFixed(2)}s  钱包 ${snapshot.walletLevel}/${policy.walletTarget}${sequence}  金币 ${Math.floor(snapshot.money)}  场上 ${snapshot.cats}/20\n${counts}`;
     if (status !== executor.lastStatus) {
       executor.lastStatus = status;
       setRunStatus(status);

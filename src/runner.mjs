@@ -40,6 +40,8 @@ export class AutoPolicy {
     this.priority = options.priority ?? team.map((entry) => entry.id);
     this.openers = options.openers ?? [];
     this.opened = new Set();
+    this.deploySequence = options.deploySequence ?? [];
+    this.sequenceIndex = 0;
     this.walletTarget = Math.min(8, Math.max(1, Number(options.walletTarget ?? 8)));
     this.economyFirst = options.economyFirst !== false;
     this.fallbackAfter = Number(options.fallbackAfter ?? Number.POSITIVE_INFINITY);
@@ -49,11 +51,16 @@ export class AutoPolicy {
     this.actions = [...(options.actions ?? [])].sort((a, b) => Number(a.at) - Number(b.at));
     this.nextAction = 0;
 
+    if (!Array.isArray(this.deploySequence) || this.deploySequence.some((id) => typeof id !== "string")) {
+      throw new Error("deploySequence must be an array of cat ids");
+    }
+
     const teamIds = new Set(team.map((entry) => entry.id));
     const referenced = [
       ...Object.keys(this.targetCounts),
       ...this.priority,
       ...this.openers,
+      ...this.deploySequence,
       ...this.fallbackPriority,
       ...this.actions.map((action) => action.id).filter(Boolean),
     ];
@@ -115,6 +122,17 @@ export class AutoPolicy {
     }
 
     const counts = engine.catsOnField();
+    if (engine.walletLevel >= this.walletTarget || !this.economyFirst) {
+      if (this.sequenceIndex < this.deploySequence.length) {
+        const id = this.deploySequence[this.sequenceIndex];
+        if (this.deployId(engine, id)) {
+          this.sequenceIndex++;
+          return true;
+        }
+        if (this.autoCannon && engine.cannonCharge >= 30) return engine.fireCannon();
+        return false;
+      }
+    }
     for (const id of this.priority) {
       const target = this.targetCounts[id] ?? 0;
       if ((counts[id] ?? 0) < target) {
@@ -137,6 +155,7 @@ export function simulate({
   snapshot,
   team,
   stageId = null,
+  stage = null,
   seed = 1,
   items = [],
   policy = {},
@@ -146,18 +165,18 @@ export function simulate({
 }) {
   if (!snapshot?.catalog) throw new Error("snapshot.catalog is required");
   const normalizedTeam = normalizeTeam(snapshot.catalog, team);
-  const stage = selectStage(snapshot, stageId);
+  const selectedStage = stage ?? selectStage(snapshot, stageId);
   const events = [];
   const engine = new BattleEngine({
     catalog: snapshot.catalog,
-    stage,
+    stage: selectedStage,
     team: normalizedTeam,
     seed,
     items,
     onEvent: recordEvents ? (type, payload) => events.push({ type, ...payload }) : null,
   });
   const controller = new AutoPolicy(normalizedTeam, policy);
-  const hardStop = maxTime == null ? stage.time_limit ?? 1200 : Number(maxTime);
+  const hardStop = maxTime == null ? selectedStage.time_limit ?? 1200 : Number(maxTime);
 
   while (engine.result === "playing" && engine.time < hardStop) {
     controller.act(engine);
@@ -167,13 +186,19 @@ export function simulate({
   const duration = Math.min(engine.time, hardStop);
   return {
     seed: Number(seed),
-    stage: { id: stage.id, name: stage.name, modifier: stage.modifier, timeLimit: stage.time_limit },
+    stage: {
+      id: selectedStage.id,
+      name: selectedStage.name,
+      modifier: selectedStage.modifier,
+      timeLimit: selectedStage.time_limit,
+    },
     result: engine.result === "playing" ? "limit" : engine.result,
     duration,
     round: Math.min(30, Math.floor(duration / 30) + 1),
     towerHp: Math.max(0, Math.round(engine.catBaseHp)),
     towerMaxHp: engine.catBaseMax,
     enemyBaseHp: Math.max(0, Math.round(engine.mouseBaseHp)),
+    bossDamage: Math.round(engine.bossDamage),
     money: Math.floor(engine.money),
     walletLevel: engine.walletLevel,
     field: engine.catsOnField(),
@@ -211,6 +236,8 @@ export function aggregate(runs) {
     results[run.result] = (results[run.result] ?? 0) + 1;
     rounds[run.round] = (rounds[run.round] ?? 0) + 1;
   }
+  const bossDamages = runs.map((run) => run.bossDamage ?? 0).sort((a, b) => a - b);
+  const bossMean = bossDamages.reduce((sum, value) => sum + value, 0) / bossDamages.length;
   return {
     runs: runs.length,
     mean,
@@ -219,6 +246,14 @@ export function aggregate(runs) {
     median: percentile(durations, 0.5),
     p90: percentile(durations, 0.9),
     max: durations[durations.length - 1],
+    bossDamage: {
+      mean: bossMean,
+      min: bossDamages[0],
+      p10: percentile(bossDamages, 0.1),
+      median: percentile(bossDamages, 0.5),
+      p90: percentile(bossDamages, 0.9),
+      max: bossDamages[bossDamages.length - 1],
+    },
     results,
     rounds,
   };

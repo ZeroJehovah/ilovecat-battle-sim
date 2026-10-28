@@ -12,6 +12,7 @@
 {
   "name": "candidate-name",
   "stageId": 9101,
+  "stage": null,
   "team": [
     { "id": "c2", "level": 40 },
     { "id": "s4", "level": 17 }
@@ -21,6 +22,7 @@
     "walletTarget": 8,
     "economyFirst": true,
     "openers": ["c2"],
+    "deploySequence": ["s4", "c2", "s1"],
     "targetCounts": { "s4": 7, "s1": 6, "c2": 1 },
     "priority": ["s4", "s1", "c2"],
     "fallbackAfter": 775,
@@ -34,6 +36,7 @@
 ```
 
 - `stageId`: id from the captured catalog. Omit it to use `.stage` (the captured endless stage, currently 9101).
+- `stage`: optional inline stage object. When present it takes precedence over `stageId`; use this for event stages that are not part of the captured catalog.
 - `team`: at most the catalog's `team_size`, normally 10. Each entry is a unique cat id plus a level. Repeated copies on the field come from repeatedly deploying one slot.
 - `items`: any of `start_coins`, `fast_coins`, `strong_base`, `cannon_ready`, `rally`.
 - `maxTime`: stop the simulation early. The reported `duration` never exceeds this value. Use `null` or omit it for the stage time limit.
@@ -45,6 +48,8 @@
 The action loop runs before each 0.02-second battle step and performs at most one world action per step.
 
 - `openers`: cat ids deployed once before the economy phase. Deployment can fail if money or cooldown is insufficient and is retried later.
+- `deploySequence`: optional ordered cat-id list deployed after the wallet target is reached. Repeated ids are allowed. The next entry is strict: if it is unaffordable, cooling down, or unavailable, the policy waits for that exact cat and does not fall through to `priority` or `fallbackPriority` until the sequence is complete.
+- `autoCannon`: with a deploy sequence, a charged cannon may still fire while the policy is waiting for the next fixed unit; the cannon does not spend money or advance the sequence.
 - `walletTarget`: wallet level from 1 to 8. While below it, the policy first satisfies unfilled openers, then buys the next wallet level when affordable.
 - `economyFirst`: when true, the policy waits for the wallet target before spending on the normal lineup. This does not stop scheduled actions.
 - `targetCounts`: desired number of living copies per cat id. Zero or absent means no permanent target.
@@ -94,13 +99,14 @@ A single run reports:
 - `duration`: simulated battle seconds.
 - `round`: `min(30, floor(duration / 30) + 1)` for the endless display convention.
 - `towerHp`, `towerMaxHp`, `enemyBaseHp`, `money`, `walletLevel`, `field`, and `fieldCount`.
+- `bossDamage`: direct damage dealt to the stage's declared boss. On a timed boss stage that cannot be defeated in one attempt, this is the primary score metric.
 - `stats`: deployments, mouse kills, cat losses, and rage triggers.
 - `telemetry`: damage, kills, healing, deployment counts, deaths, maximum simultaneous copies, and first deployment/death times by cat id.
 - `deaths`: individual cat loss timestamps and positions.
 - `events`: only with `--events`; useful for precise hit/heal/freeze/rage timing.
 - `actionLog`: only with `--trace`; every deploy, wallet, and cannon action with its battle-clock time.
 
-Batch output adds mean, minimum, P10, median, P90, maximum, result counts, and round counts. Compare uses one shared seed range for every candidate.
+Batch output adds duration and boss-damage mean, minimum, P10, median, P90, maximum, plus result counts and round counts. Compare uses one shared seed range for every candidate.
 
 ## Validation limits
 

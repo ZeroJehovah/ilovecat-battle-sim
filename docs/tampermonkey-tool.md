@@ -8,6 +8,12 @@
 2. 打开 `https://api.ilovecat520.me/playground/battle`，确认右上角出现猫咪按钮。
 3. 首次使用“导出数据”前，至少进入过一次战斗页，让浏览器加载当前战斗 JS。
 
+当前 `main` 分支的安装地址：
+
+```text
+https://raw.githubusercontent.com/ZeroJehovah/ilovecat-battle-sim/main/tools/ilovecat-workbench.user.js
+```
+
 脚本匹配游戏域名下的页面，但只有点击猫咪按钮后才读取数据。导出请求与普通页面请求使用同一登录态；脚本不会展示、复制或上传 UID、Cookie 或请求头。
 
 ## 导出内容
@@ -45,6 +51,7 @@
     "walletTarget": 8,
     "economyFirst": true,
     "openers": [],
+    "deploySequence": ["s4", "s1", "s1"],
     "targetCounts": { "s4": 3, "s1": 10 },
     "priority": ["s4", "s1"],
     "fallbackAfter": 775,
@@ -62,6 +69,7 @@
 
 - 钱包低于目标时，先完成尚未成功的 `openers`，再在金币足够时升级钱包；
 - `economyFirst=true` 时，等待钱包达标后才铺正常阵容；
+- `deploySequence` 是钱包达标后严格执行的上场顺序，允许重复 id；下一只金币不足或槽位冷却时原地等待，不会改买 `priority` 或其他便宜猫；等待期间仍可发射已充能的猫爪炮；序列完成后才进入目标存活数维护；
 - 钱包达标后，按 `priority` 检查目标存活数，槽位冷却时跳过并检查下一只；
 - 到达 `fallbackAfter` 后，在目标无法补位时使用 `fallbackPriority` 填场；
 - 自动猫爪炮只会在没有更高优先级操作时发射。

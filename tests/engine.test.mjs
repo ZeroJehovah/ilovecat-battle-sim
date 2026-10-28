@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { BattleEngine } from "../src/engine.mjs";
-import { simulate } from "../src/runner.mjs";
+import { aggregate, AutoPolicy, simulate } from "../src/runner.mjs";
 
 const snapshot = JSON.parse(
   await readFile(new URL("../data/snapshot.json", import.meta.url), "utf8"),
@@ -169,6 +169,73 @@ test("scheduled deploy and wallet actions run without automatic fill", () => {
   assert.equal(result.walletLevel, 2);
   assert.deepEqual({ ...result.field }, { c2: 1 });
   assert.equal(result.actions, 2);
+});
+
+test("deploySequence waits for the next fixed unit instead of buying a cheaper unit", () => {
+  const result = simulate({
+    snapshot,
+    team: [
+      { id: "c7", level: 1 },
+      { id: "c3", level: 1 },
+      { id: "c2", level: 1 },
+    ],
+    stageId: 9101,
+    maxTime: 12,
+    policy: {
+      walletTarget: 1,
+      deploySequence: ["c7", "c2"],
+      priority: ["c3"],
+      targetCounts: { c3: 1 },
+    },
+  });
+  const first = result.telemetry.firstDeployAt;
+  assert.ok(first.c7 > 0);
+  assert.ok(first.c2 > first.c7);
+  if (first.c3 != null) assert.ok(first.c3 > first.c2);
+});
+
+test("deploySequence may fire a charged cannon while saving for the next unit", () => {
+  const team = [{ id: "c7", level: 1 }];
+  const engine = engineFor(team, bareStage());
+  engine.cannonCharge = 30;
+  const policy = new AutoPolicy(team, {
+    walletTarget: 1,
+    deploySequence: ["c7"],
+    targetCounts: { c7: 0 },
+    autoCannon: true,
+  });
+  assert.equal(policy.act(engine), true);
+  assert.equal(engine.actions[0].type, "cannon");
+  assert.equal(engine.actions.length, 1);
+});
+
+test("world-boss runs report direct boss damage and aggregate its distribution", () => {
+  const worldBoss = {
+    id: 9001,
+    name: "World Boss Test",
+    base_hp: 99_999_999,
+    boss: "m28",
+    time_limit: 30,
+    scale: 1,
+    waves: [{ at: 1, count: 1, gap: 0, mouse: "m28" }],
+  };
+  const run = (seed) => simulate({
+    snapshot,
+    stage: worldBoss,
+    team: [{ id: "c7", level: 10 }],
+    seed,
+    policy: {
+      walletTarget: 1,
+      deploySequence: ["c7"],
+      targetCounts: { c7: 1 },
+    },
+  });
+  const runs = [run(1), run(2)];
+  assert.ok(runs.every((result) => result.bossDamage > 0));
+  assert.equal(runs[0].result, "timeup");
+  const stats = aggregate(runs);
+  assert.equal(stats.bossDamage.min, Math.min(...runs.map((result) => result.bossDamage)));
+  assert.equal(stats.bossDamage.max, Math.max(...runs.map((result) => result.bossDamage)));
 });
 
 test("a recorded action log replays exactly", () => {

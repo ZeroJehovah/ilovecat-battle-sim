@@ -80,6 +80,7 @@ function tableForAggregate(name, aggregateResult) {
     `Runs: ${aggregateResult.runs}`,
     `Mean: ${aggregateResult.mean.toFixed(2)}s (${formatDuration(aggregateResult.mean)})`,
     `Min/P10/Median/P90/Max: ${aggregateResult.min.toFixed(2)} / ${aggregateResult.p10.toFixed(2)} / ${aggregateResult.median.toFixed(2)} / ${aggregateResult.p90.toFixed(2)} / ${aggregateResult.max.toFixed(2)}s`,
+    `Boss damage Mean/Min/P10/Median/P90/Max: ${aggregateResult.bossDamage.mean.toFixed(2)} / ${aggregateResult.bossDamage.min} / ${aggregateResult.bossDamage.p10.toFixed(2)} / ${aggregateResult.bossDamage.median.toFixed(2)} / ${aggregateResult.bossDamage.p90.toFixed(2)} / ${aggregateResult.bossDamage.max}`,
     `Results: ${Object.entries(aggregateResult.results).map(([key, value]) => `${key}=${value}`).join(", ")}`,
     `Rounds: ${Object.entries(aggregateResult.rounds).map(([key, value]) => `R${key}=${value}`).join(", ")}`,
   ].join("\n");
@@ -89,9 +90,9 @@ function markdownForAggregate(name, result) {
   return [
     `### ${name}`,
     "",
-    "| Runs | Mean | Min | P10 | Median | P90 | Max | Results | Rounds |",
-    "|---:|---:|---:|---:|---:|---:|---:|---|---|",
-    `| ${result.runs} | ${result.mean.toFixed(2)}s | ${result.min.toFixed(2)}s | ${result.p10.toFixed(2)}s | ${result.median.toFixed(2)}s | ${result.p90.toFixed(2)}s | ${result.max.toFixed(2)}s | ${Object.entries(result.results).map(([key, value]) => `${key}=${value}`).join(", ")} | ${Object.entries(result.rounds).map(([key, value]) => `R${key}=${value}`).join(", ")} |`,
+    "| Runs | Mean | Min | P10 | Median | P90 | Max | Boss Mean | Boss Min | Boss P10 | Boss Median | Boss P90 | Boss Max | Results | Rounds |",
+    "|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---|",
+    `| ${result.runs} | ${result.mean.toFixed(2)}s | ${result.min.toFixed(2)}s | ${result.p10.toFixed(2)}s | ${result.median.toFixed(2)}s | ${result.p90.toFixed(2)}s | ${result.max.toFixed(2)}s | ${result.bossDamage.mean.toFixed(2)} | ${result.bossDamage.min} | ${result.bossDamage.p10.toFixed(2)} | ${result.bossDamage.median.toFixed(2)} | ${result.bossDamage.p90.toFixed(2)} | ${result.bossDamage.max} | ${Object.entries(result.results).map(([key, value]) => `${key}=${value}`).join(", ")} | ${Object.entries(result.rounds).map(([key, value]) => `R${key}=${value}`).join(", ")} |`,
   ].join("\n");
 }
 
@@ -101,10 +102,10 @@ function chunkSeeds(seeds, workers) {
   return chunks.filter((chunk) => chunk.length);
 }
 
-function runWorkerChunk(snapshot, scenario, seeds, stageId, items, maxTime) {
+function runWorkerChunk(snapshot, scenario, seeds, stageId, stage, items, maxTime) {
   return new Promise((resolvePromise, reject) => {
     const worker = new Worker(new URL("./worker.mjs", import.meta.url), {
-      workerData: { snapshot, scenario, seeds, stageId, items, maxTime },
+      workerData: { snapshot, scenario, seeds, stageId, stage, items, maxTime },
     });
     worker.once("message", (message) => {
       worker.terminate();
@@ -118,11 +119,11 @@ function runWorkerChunk(snapshot, scenario, seeds, stageId, items, maxTime) {
   });
 }
 
-async function runBatch(snapshot, scenario, { seeds, jobs, stageId, items, maxTime }) {
+async function runBatch(snapshot, scenario, { seeds, jobs, stageId, stage, items, maxTime }) {
   const workers = Math.max(1, Math.min(Number(jobs || cpus().length), seeds.length));
   const chunks = chunkSeeds(seeds, workers);
   const grouped = await Promise.all(
-    chunks.map((chunk) => runWorkerChunk(snapshot, scenario, chunk, stageId, items, maxTime)),
+    chunks.map((chunk) => runWorkerChunk(snapshot, scenario, chunk, stageId, stage, items, maxTime)),
   );
   const runs = grouped.flat().sort((a, b) => a.seed - b.seed);
   return { aggregate: aggregate(runs), runs };
@@ -135,6 +136,7 @@ function seedRange(start, count) {
 function commonScenarioContext(scenario, options) {
   return {
     stageId: options["stage-id"] ?? scenario.stageId ?? null,
+    stage: scenario.stage ?? null,
     items: scenario.items ?? [],
     maxTime: scenario.maxTime ?? null,
   };
@@ -158,9 +160,9 @@ async function commandRun(snapshot, scenario, options) {
     return [
       `### ${payload.name}`,
       "",
-      "| Seed | Result | Time | Round | Tower HP | Field | Deployed | Kills | Wallet |",
-      "|---:|---|---:|---:|---:|---:|---:|---:|---:|",
-      `| ${payload.seed} | ${payload.result} | ${payload.duration.toFixed(2)}s | ${payload.round} | ${payload.towerHp}/${payload.towerMaxHp} | ${payload.fieldCount} | ${payload.stats.deployed} | ${payload.stats.beaten} | ${payload.walletLevel} |`,
+      "| Seed | Result | Time | Round | Tower HP | Boss Damage | Field | Deployed | Kills | Wallet |",
+      "|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|",
+      `| ${payload.seed} | ${payload.result} | ${payload.duration.toFixed(2)}s | ${payload.round} | ${payload.towerHp}/${payload.towerMaxHp} | ${payload.bossDamage} | ${payload.fieldCount} | ${payload.stats.deployed} | ${payload.stats.beaten} | ${payload.walletLevel} |`,
     ].join("\n");
   }
   return tableForAggregate(payload.name, {
@@ -171,6 +173,14 @@ async function commandRun(snapshot, scenario, options) {
     median: payload.duration,
     p90: payload.duration,
     max: payload.duration,
+    bossDamage: {
+      mean: payload.bossDamage,
+      min: payload.bossDamage,
+      p10: payload.bossDamage,
+      median: payload.bossDamage,
+      p90: payload.bossDamage,
+      max: payload.bossDamage,
+    },
     results: { [payload.result]: 1 },
     rounds: { [payload.round]: 1 },
   });
