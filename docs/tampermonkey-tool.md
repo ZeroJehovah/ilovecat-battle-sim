@@ -16,6 +16,8 @@ https://raw.githubusercontent.com/ZeroJehovah/ilovecat-battle-sim/main/tools/ilo
 
 也可以在“执行策略”页直接点击“导入 JSON 文件”，避免长策略经过剪贴板时只复制到部分内容。
 
+面板标题下方会显示当前版本号；`0.1.5` 起脚本声明了 `@updateURL` 和 `@downloadURL`，Tampermonkey 可以直接检查 GitHub `main` 分支更新。
+
 脚本匹配游戏域名下的页面，但只有点击猫咪按钮后才读取数据。导出请求与普通页面请求使用同一登录态；脚本不会展示、复制或上传 UID、Cookie 或请求头。
 
 ## 导出内容

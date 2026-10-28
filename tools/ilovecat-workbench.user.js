@@ -1,9 +1,11 @@
 // ==UserScript==
 // @name         喵喵的逆袭 · 数据导出与策略执行
 // @namespace    https://github.com/ZeroJehovah/ilovecat-battle-sim
-// @version      0.1.4
+// @version      0.1.5
 // @description  只读导出战斗数据与当前 JS，并按 JSON 策略操作战斗页面
 // @match        https://api.ilovecat520.me/*
+// @updateURL    https://raw.githubusercontent.com/ZeroJehovah/ilovecat-battle-sim/main/tools/ilovecat-workbench.user.js
+// @downloadURL  https://raw.githubusercontent.com/ZeroJehovah/ilovecat-battle-sim/main/tools/ilovecat-workbench.user.js
 // @grant        none
 // @run-at       document-idle
 // ==/UserScript==
@@ -13,6 +15,7 @@
 
   const STRATEGY_FORMAT = "ilovecat-battle-strategy";
   const EXPORT_FORMAT = "ilovecat-game-export";
+  const USERSCRIPT_VERSION = "0.1.5";
   const STORAGE_KEY = "ilovecat-workbench-strategy";
   const ACTION_GAP_MS = 250;
   const LOOP_MS = 100;
@@ -96,7 +99,7 @@
         <div class="head">
           <div>
             <div class="title">喵喵的逆袭工具</div>
-            <div class="muted">只读导出；执行器只点击页面上的战斗按钮</div>
+            <div class="muted">v${USERSCRIPT_VERSION} · 只读导出；执行器只点击页面上的战斗按钮</div>
           </div>
           <button class="close" title="收起">×</button>
         </div>
