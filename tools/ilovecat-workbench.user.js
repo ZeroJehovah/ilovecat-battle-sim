@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         喵喵的逆袭 · 数据导出与策略执行
 // @namespace    https://github.com/ZeroJehovah/ilovecat-battle-sim
-// @version      0.1.6
+// @version      0.1.7
 // @description  只读导出战斗数据与当前 JS，并按 JSON 策略操作战斗页面
 // @match        https://api.ilovecat520.me/*
 // @updateURL    https://raw.githubusercontent.com/ZeroJehovah/ilovecat-battle-sim/main/tools/ilovecat-workbench.user.js
@@ -15,12 +15,19 @@
 
   const STRATEGY_FORMAT = "ilovecat-battle-strategy";
   const EXPORT_FORMAT = "ilovecat-game-export";
-  const USERSCRIPT_VERSION = "0.1.6";
+  const USERSCRIPT_VERSION = "0.1.7";
   const STORAGE_KEY = "ilovecat-workbench-strategy";
   const ACTION_GAP_MS = 250;
   const LOOP_MS = 100;
   const BATTLE_START_TIMEOUT_MS = 20000;
   const CANNON_READY = 1;
+  const ITEM_NAMES = {
+    start_coins: "開場金幣",
+    fast_coins: "加速補給",
+    strong_base: "主堡加固",
+    cannon_ready: "貓爪砲預熱",
+    rally: "全軍振奮",
+  };
 
   let executor = null;
   let busy = false;
@@ -91,6 +98,12 @@
         }
         input[type="file"][hidden] { display: none !important; }
         .warning { color: #f4ca7c; }
+        .item-warning {
+          margin: 8px 0 0; padding: 8px 10px; border-radius: 8px;
+          border: 1px solid #8a4b2a; background: #2a1b14; color: #ffc38a;
+          font-size: 12px; line-height: 1.5;
+        }
+        .item-warning[hidden] { display: none !important; }
         .copy-fallback[hidden] { display: none !important; }
         .copy-fallback { margin-top: 10px; }
         .copy-fallback textarea { min-height: 150px; }
@@ -127,6 +140,8 @@
           <textarea spellcheck="false" placeholder="粘贴 ilovecat-battle-strategy JSON"></textarea>
           <input class="strategy-file" type="file" accept=".json,application/json" hidden>
           <label class="check warning"><input class="auto-start" type="checkbox"> 无战斗时由脚本点击“开始战斗”（消耗 1 次挑战）</label>
+          <p class="item-warning" hidden></p>
+          <label class="check warning"><input class="auto-items" type="checkbox"> 自动勾选策略所需消耗品（会消耗库存）</label>
           <div class="actions">
             <button class="load-strategy">导入 JSON 文件</button>
             <button class="validate">校验</button>
@@ -154,6 +169,8 @@
       strategy: root.querySelector('[data-view="execute"] textarea'),
       strategyFile: root.querySelector(".strategy-file"),
       autoStart: root.querySelector(".auto-start"),
+      autoItems: root.querySelector(".auto-items"),
+      itemWarning: root.querySelector(".item-warning"),
       loadStrategy: root.querySelector(".load-strategy"),
       validate: root.querySelector(".validate"),
       run: root.querySelector(".run"),
@@ -211,6 +228,14 @@
     }));
     ui.run.addEventListener("click", () => runBusy(() => startFromUi()));
     ui.stop.addEventListener("click", () => stopExecutor("用户停止。"));
+    ui.autoItems.addEventListener("change", () => {
+      try {
+        const strategy = parseStrategy(ui.strategy.value);
+        updateItemWarning(strategy, findPreparationRuntime(strategy));
+      } catch {
+        // Keep the previous warning when the textarea is not yet valid JSON.
+      }
+    });
   }
 
   function showTab(name) {
@@ -601,12 +626,14 @@
     saveStorage(ui.strategy.value);
     const runtime = findBattleRuntime();
     const active = isActiveRuntime(runtime) ? runtime : { context: null, snapshot: null };
-    const messages = validateStrategy(strategy, active);
+    const prep = active.context ? null : findPreparationRuntime(strategy);
+    const names = namesForStrategy(strategy, active, prep);
+    const messages = validateStrategy(strategy, active, names);
     if (!active.context) {
-      const prep = findPreparationRuntime(strategy);
       if (prep) messages.push(...validatePreparation(strategy, prep));
-      else messages.push("提示：没有找到与策略关卡名称匹配的“出战”准备界面。");
+      else messages.push("提示：没有找到可用的“出战”准备界面（按策略关卡 id/名称匹配）。");
     }
+    updateItemWarning(strategy, prep, Boolean(active.context));
     setRunStatus(messages.join("\n"), messages.some((line) => line.startsWith("错误")));
     return strategy;
   }
@@ -615,8 +642,47 @@
     return Boolean(runtime.context && runtime.snapshot && runtime.snapshot.result === "playing");
   }
 
-  function validateStrategy(strategy, runtime) {
+  function namesForStrategy(_strategy, runtime, prep) {
+    const names = new Map();
+    for (const [id, name] of prep?.names ?? []) names.set(id, name);
+    for (const entry of prep?.team ?? []) names.set(entry.id, entry.name);
+    for (const entry of runtime?.context?.team ?? []) names.set(entry.id, entry.name);
+    return names;
+  }
+
+  function strategyRosterLines(strategy, names = new Map()) {
+    const team = Array.isArray(strategy.team) ? strategy.team : [];
+    if (!team.length) return [];
+    const roster = team.map((entry) => {
+      const name = names.get(entry.id) || entry.id;
+      const target = strategy.policy?.targetCounts?.[entry.id];
+      return `${entry.id} ${name} Lv.${entry.level}${target != null ? ` ×${target}` : ""}`;
+    });
+    const sequence = compressSequence(strategy.policy?.deploySequence ?? [], names);
+    return [
+      `策略队伍：${roster.join("；")}`,
+      sequence ? `出战顺序：${sequence}` : null,
+    ].filter(Boolean);
+  }
+
+  function compressSequence(ids, names = new Map()) {
+    const groups = [];
+    for (const id of ids) {
+      const last = groups.at(-1);
+      if (last?.id === id) last.count++;
+      else groups.push({ id, count: 1 });
+    }
+    return groups.map(({ id, count }) => {
+      const name = names.get(id) || id;
+      return `${id} ${name}${count > 1 ? `×${count}` : ""}`;
+    }).join(" → ");
+  }
+
+  function validateStrategy(strategy, runtime, names = null) {
     const messages = [`策略：${strategy.name || "未命名"}`];
+    const nameMap = names ?? new Map((runtime.context?.team ?? []).map((entry) => [entry.id, entry.name]));
+    const describe = (id) => `${id} ${nameMap.get(id) || ""}`.trim();
+    messages.push(...strategyRosterLines(strategy, nameMap));
     let hasError = false;
     if (!runtime.context) {
       messages.push("提示：当前没有进行中的战斗；请先配置队伍、道具并开始战斗。");
@@ -640,19 +706,19 @@
     ]);
     const missingFromBattle = [...referenced].filter((id) => !actualIds.has(id));
     if (missingFromBattle.length) {
-      messages.push(`错误：当前战斗队伍缺少策略引用的 ${missingFromBattle.join(", ")}。`);
+      messages.push(`错误：当前战斗队伍缺少策略引用的 ${missingFromBattle.map(describe).join("、")}。`);
       hasError = true;
     }
     if (strategy.team) {
       const missing = strategy.team.filter((entry) => !actualIds.has(entry.id));
       if (missing.length) {
-        messages.push(`错误：当前队伍缺少 ${missing.map((entry) => entry.id).join(", ")}。`);
+        messages.push(`错误：当前队伍缺少 ${missing.map((entry) => describe(entry.id)).join("、")}。`);
         hasError = true;
       }
       const actualLevels = new Map(runtime.context.team.map((entry) => [entry.id, entry.level]));
-      const levelMismatch = strategy.team.filter((entry) => actualLevels.get(entry.id) !== entry.level);
+      const levelMismatch = strategy.team.filter((entry) => actualIds.has(entry.id) && actualLevels.get(entry.id) !== entry.level);
       if (levelMismatch.length) {
-        messages.push(`警告：等级不一致：${levelMismatch.map((entry) => `${entry.id} 需要 ${entry.level}，当前 ${actualLevels.get(entry.id) ?? "未上阵"}`).join("；")}。`);
+        messages.push(`警告：等级不一致：${levelMismatch.map((entry) => `${describe(entry.id)} 需要 ${entry.level}，当前 ${actualLevels.get(entry.id)}`).join("；")}。`);
       }
     }
     if (strategy.items) {
@@ -661,7 +727,7 @@
       const missing = [...expectedItems].filter((item) => !actualItems.has(item));
       const extra = [...actualItems].filter((item) => !expectedItems.has(item));
       if (missing.length || extra.length) {
-        messages.push(`警告：战斗道具不一致。缺少 ${missing.join(", ") || "无"}；多出 ${extra.join(", ") || "无"}。`);
+        messages.push(`警告：战斗道具不一致。缺少 ${missing.map((id) => `${id} ${ITEM_NAMES[id] || ""}`.trim()).join("、") || "无"}；多出 ${extra.map((id) => `${id} ${ITEM_NAMES[id] || ""}`.trim()).join("、") || "无"}。`);
       }
     }
     messages.push(hasError ? "校验失败。" : "校验通过；执行器仍需在战斗进行中运行。");
@@ -670,23 +736,46 @@
 
   function findPreparationRuntime(strategy) {
     const stageName = typeof strategy.stage?.name === "string" ? strategy.stage.name.trim() : "";
-    if (!stageName) return null;
+    if (!stageName && strategy.stageId == null) return null;
     const dialogs = [...document.querySelectorAll('[role="dialog"], .snowapi-dialog-content')];
     const seen = new Set();
+    let candidate = null;
     for (const dialog of dialogs) {
       if (seen.has(dialog) || !(dialog.offsetWidth || dialog.offsetHeight)) continue;
       seen.add(dialog);
       const title = dialog.querySelector('[data-slot="dialog-title"], h2')?.textContent?.trim() || "";
-      if (!title.includes(stageName)) continue;
       const startButton = [...dialog.querySelectorAll("button")].find((button) => {
         if (button.disabled || !(button.offsetWidth || button.offsetHeight)) return false;
         return /^(?:开始战斗|開始戰鬥|开始挑战|開始挑戰)$/.test(button.innerText.trim());
       });
       if (!startButton) continue;
       const meta = readPreparationMeta(startButton, dialog, title);
-      if (meta) return { dialog, startButton, ...meta };
+      if (!meta) continue;
+      const runtime = { dialog, startButton, ...meta, stageMatch: true };
+      const hasStageId = meta.stage?.id != null && strategy.stageId != null;
+      if (hasStageId) {
+        if (Number(meta.stage.id) === Number(strategy.stageId)) return runtime;
+      } else {
+        const titleMatches = matchesStageTitle(title, stageName);
+        const metaNameMatches = meta.stage?.name ? matchesStageTitle(meta.stage.name, stageName) : false;
+        if (titleMatches || metaNameMatches) return runtime;
+      }
+      candidate ??= { ...runtime, stageMatch: false };
     }
-    return null;
+    // No match: keep the first usable preparation dialog so validation can
+    // report exactly which stage is open instead of only "not found".
+    return candidate;
+  }
+
+  function matchesStageTitle(title, stageName) {
+    const normalizedTitle = String(title).replace(/\s+/g, " ").trim();
+    const normalizedName = String(stageName).replace(/\s+/g, " ").trim();
+    if (!normalizedTitle || !normalizedName) return false;
+    if (normalizedTitle === normalizedName) return true;
+    return ["·", "・", "-", "—", ":"].some((separator) => {
+      return normalizedTitle.endsWith(`${separator} ${normalizedName}`) ||
+        normalizedTitle.endsWith(`${separator}${normalizedName}`);
+    });
   }
 
   function readPreparationMeta(startButton, dialog, title) {
@@ -694,6 +783,7 @@
     if (!fiberKey) return null;
     let fiber = startButton[fiberKey];
     let props = null;
+    let stage = null;
     let depth = 0;
     while (fiber && depth++ < 45) {
       const candidate = fiber.memoizedProps;
@@ -701,6 +791,7 @@
           candidate.catalog && candidate.state &&
           Array.isArray(candidate.team) && typeof candidate.onStart === "function") {
         props = candidate;
+        stage = readStageFromFiber(fiber, title);
         break;
       }
       fiber = fiber.return;
@@ -708,6 +799,7 @@
     if (!props) return null;
 
     const cats = new Map((props.catalog.cats ?? []).map((cat) => [String(cat.id), cat]));
+    const names = new Map([...cats].map(([id, cat]) => [id, String(cat?.name ?? id)]));
     const units = new Map((props.state.units ?? []).map((unit) => [String(unit.cat_id), unit]));
     const team = props.team.map((id, slot) => {
       const key = String(id);
@@ -731,39 +823,74 @@
         name: label.querySelector(".font-medium")?.textContent?.trim() || id,
         count,
         selected: Boolean(input?.checked),
+        input,
       };
     }).filter((item) => item.id);
     return {
       title,
       team,
       items,
+      names,
+      stage,
       starting: Boolean(props.starting),
     };
   }
 
+  function readStageFromFiber(fiber, title) {
+    const candidates = [];
+    let hook = fiber.memoizedState;
+    let index = 0;
+    while (hook && index++ < 160) {
+      const value = hook.memoizedState;
+      if (value && typeof value === "object" && value.id != null && value.name && Array.isArray(value.waves)) {
+        candidates.push({ id: Number(value.id), name: String(value.name) });
+      }
+      hook = hook.next;
+    }
+    if (!candidates.length) return null;
+    return candidates.find((stage) => matchesStageTitle(title, stage.name) || String(title).includes(stage.name)) || candidates[0];
+  }
+
   function validatePreparation(strategy, prep) {
     const messages = [`准备界面：${prep.title}`];
-    let hasError = false;
+    const stageCheck = validatePreparationStage(strategy, prep);
+    messages.push(...stageCheck.messages);
+    let hasError = stageCheck.hasError;
     const expectedTeam = Array.isArray(strategy.team) ? strategy.team : [];
+    const nameOf = (id) => prep.names?.get(id) || prep.team.find((entry) => entry.id === id)?.name || id;
 
     if (expectedTeam.length) {
       const actualIds = prep.team.map((entry) => entry.id);
       const expectedIds = expectedTeam.map((entry) => entry.id);
-      const prefixMatches = expectedIds.every((id, index) => actualIds[index] === id);
-      if (!prefixMatches) {
-        messages.push(`错误：准备队伍前 ${expectedIds.length} 槽应为 ${expectedIds.join(" / ")}，当前 ${actualIds.slice(0, Math.max(4, expectedIds.length)).join(" / ") || "空"}。请先点“调整队伍”保存策略顺序。`);
+      const missing = expectedIds.filter((id) => !actualIds.includes(id));
+      if (missing.length) {
+        messages.push(`错误：编队缺少策略需要的 ${missing.map((id) => `${id} ${nameOf(id)}`).join("、")}。当前编队：${prep.team.map((entry) => `${entry.id} ${entry.name}`).join(" / ") || "空"}。`);
         hasError = true;
       } else {
-        messages.push(`队伍：${expectedIds.join(" / ")}（前 ${expectedIds.length} 槽匹配）`);
+        messages.push(`队伍：所需猫咪均在编队中（${expectedIds.map((id) => `${id} ${nameOf(id)}`).join(" / ")}）。顺序不强制。`);
+        const positions = expectedIds.map((id) => actualIds.indexOf(id));
+        const orderPreserved = positions.every((slot, index) => index === 0 || slot > positions[index - 1]);
+        if (!orderPreserved) {
+          messages.push("提示：编队顺序与策略不同；游戏机制不受影响，执行器按猫 id 查找槽位。");
+        }
+        const onSecondPage = expectedIds.filter((id) => actualIds.indexOf(id) >= 5);
+        if (onSecondPage.length) {
+          messages.push(`提示：${onSecondPage.map((id) => `${id} ${nameOf(id)}`).join("、")} 在第 2 页；执行器需要翻页，会增加真实操作时间。`);
+        }
+        const extras = actualIds.filter((id) => !expectedIds.includes(id));
+        if (extras.length) {
+          messages.push(`额外槽位：${extras.map((id) => `${id} ${nameOf(id)}`).join("、")}；不会被策略主动部署。`);
+        }
       }
       const actualLevels = new Map(prep.team.map((entry) => [entry.id, entry.level]));
-      const levelMismatch = expectedTeam.filter((entry) => Number(entry.level) !== actualLevels.get(entry.id));
+      const levelMismatch = expectedTeam.filter((entry) => actualIds.includes(entry.id) && Number(entry.level) !== actualLevels.get(entry.id));
       if (levelMismatch.length) {
-        messages.push(`警告：准备等级不一致：${levelMismatch.map((entry) => `${entry.id} 需要 ${entry.level}，当前 ${actualLevels.get(entry.id) ?? "未知"}`).join("；")}。`);
+        messages.push(`警告：准备等级不一致：${levelMismatch.map((entry) => `${entry.id} ${nameOf(entry.id)} 需要 ${entry.level}，当前 ${actualLevels.get(entry.id)}`).join("；")}。`);
       }
     }
 
     const expectedItems = new Set((Array.isArray(strategy.items) ? strategy.items : []).map(String));
+    const itemName = (id) => prep.items.find((item) => item.id === id)?.name || ITEM_NAMES[id] || id;
     const selectedItems = prep.items.filter((item) => item.selected);
     const missing = [...expectedItems].filter((id) => !selectedItems.some((item) => item.id === id));
     const extra = selectedItems.filter((item) => !expectedItems.has(item.id));
@@ -772,7 +899,7 @@
       return !item || item.count <= 0;
     });
     if (missing.length || extra.length || unavailable.length) {
-      messages.push(`错误：准备道具不一致。缺少 ${missing.join(", ") || "无"}；多选 ${extra.map((item) => item.id).join(", ") || "无"}；库存不足 ${unavailable.join(", ") || "无"}。`);
+      messages.push(`错误：准备道具不一致。缺少 ${missing.map(itemName).join("、") || "无"}；多选 ${extra.map((item) => itemName(item.id)).join("、") || "无"}；库存不足 ${unavailable.map(itemName).join("、") || "无"}。`);
       hasError = true;
     } else {
       messages.push(`道具：${selectedItems.length ? selectedItems.map((item) => item.name).join("、") : "未使用"}。`);
@@ -782,13 +909,101 @@
     return messages;
   }
 
+  function validatePreparationStage(strategy, prep) {
+    if (prep.stageMatch !== false) {
+      return {
+        hasError: false,
+        messages: prep.stage?.id != null ? [`关卡：${prep.stage.name}（id ${prep.stage.id}）`] : [],
+      };
+    }
+    const expected = strategy.stageId != null
+      ? `id ${strategy.stageId}`
+      : `「${strategy.stage?.name ?? ""}」`;
+    const actual = prep.stage
+      ? `「${prep.stage.name}」（id ${prep.stage.id}）`
+      : `「${prep.title}」`;
+    return {
+      hasError: true,
+      messages: [`错误：当前准备界面是 ${actual}，与策略关卡 ${expected} 不符。`],
+    };
+  }
+
+  function updateItemWarning(strategy, prep, inBattle = false) {
+    const ids = Array.isArray(strategy.items) ? strategy.items.map(String) : [];
+    const selectedExtras = prep?.items.filter((item) => item.selected && !ids.includes(item.id)) ?? [];
+    if (!ids.length) {
+      if (selectedExtras.length) {
+        ui.itemWarning.hidden = false;
+        ui.itemWarning.textContent = `策略未要求消耗品，但准备界面已勾选：${selectedExtras.map((item) => item.name).join("、")}。校验会阻拦，自动勾选会取消这些选择。`;
+      } else {
+        ui.itemWarning.hidden = true;
+        ui.itemWarning.textContent = "";
+      }
+      return;
+    }
+
+    const detail = ids.map((id) => {
+      const item = prep?.items.find((entry) => entry.id === id);
+      const label = item?.name || ITEM_NAMES[id] || id;
+      if (!item) return `${label}（准备界面未找到）`;
+      return `${label}（${item.count <= 0 ? "库存不足" : `库存 ${item.count}`}${item.selected ? "，已勾选" : "，未勾选"}）`;
+    });
+    const lacking = ids.some((id) => {
+      const item = prep?.items.find((entry) => entry.id === id);
+      return !item || item.count <= 0;
+    });
+    const action = inBattle
+      ? "当前已在战斗中，无法更改道具选择。"
+      : lacking
+        ? "库存不足，脚本会阻断开战；自动勾选也无法继续。"
+        : ui.autoItems.checked
+          ? "开始执行时会按策略自动勾选/取消。"
+          : "请先在准备界面手动勾选，或启用自动勾选。";
+    ui.itemWarning.hidden = false;
+    ui.itemWarning.textContent = `本策略要求消耗：${detail.join("、")}。${action}`;
+  }
+
+  async function selectPreparationItems(strategy, prep) {
+    const expected = new Set((Array.isArray(strategy.items) ? strategy.items : []).map(String));
+    const missing = [...expected].filter((id) => !prep.items.some((item) => item.id === id));
+    if (missing.length) {
+      throw new Error(`准备界面没有策略所需消耗品：${missing.map((id) => `${id} ${ITEM_NAMES[id] || ""}`.trim()).join("、")}。`);
+    }
+    const changes = [];
+    for (const item of prep.items) {
+      const shouldSelect = expected.has(item.id);
+      if (shouldSelect && item.count <= 0) {
+        throw new Error(`消耗品库存不足：${item.name}（${item.id}）。`);
+      }
+      if (item.selected === shouldSelect) continue;
+      if (!item.input || item.input.disabled) {
+        throw new Error(`消耗品无法勾选：${item.name}（${item.id}），库存 ${item.count}。`);
+      }
+      item.input.click();
+      changes.push(`${shouldSelect ? "勾选" : "取消"} ${item.name}`);
+    }
+    if (!changes.length) return prep;
+
+    let current = prep;
+    for (let attempt = 0; attempt < 6; attempt++) {
+      await new Promise((resolve) => setTimeout(resolve, 60));
+      current = findPreparationRuntime(strategy) ?? current;
+      const selected = new Set(current.items.filter((item) => item.selected).map((item) => item.id));
+      if (selected.size === expected.size && [...expected].every((id) => selected.has(id))) return current;
+    }
+    throw new Error(`道具勾选后未能确认准备界面状态；已执行：${changes.join("、")}。`);
+  }
+
   async function startFromUi() {
     const strategy = parseStrategy(ui.strategy.value);
     saveStorage(ui.strategy.value);
     const runtime = findBattleRuntime();
     const active = isActiveRuntime(runtime) ? runtime : { context: null, snapshot: null };
-    const validation = validateStrategy(strategy, active);
+    let prep = active.context ? null : findPreparationRuntime(strategy);
+    const names = namesForStrategy(strategy, active, prep);
+    const validation = validateStrategy(strategy, active, names);
     setRunStatus(validation.join("\n"), validation.some((line) => line.startsWith("错误")));
+    updateItemWarning(strategy, prep, Boolean(active.context));
     if (validation.some((line) => line.startsWith("错误"))) {
       throw new Error(validation.join("\n") || "策略校验失败，未开始执行。");
     }
@@ -802,8 +1017,18 @@
       throw new Error("当前没有进行中的战斗。勾选“无战斗时由脚本点击开始战斗”，或先手动开始战斗。");
     }
 
-    const prep = findPreparationRuntime(strategy);
-    if (!prep) throw new Error("没有找到与策略关卡名称匹配的“出战”准备界面。请先打开对应关卡准备界面。");
+    if (!prep) throw new Error("没有找到可用的“出战”准备界面。请先打开策略对应的关卡准备界面。");
+    const stageCheck = validatePreparationStage(strategy, prep);
+    if (stageCheck.hasError) {
+      const full = [...validation, `准备界面：${prep.title}`, ...stageCheck.messages];
+      setRunStatus(full.join("\n"), true);
+      throw new Error(stageCheck.messages.join("\n"));
+    }
+    if (ui.autoItems.checked) {
+      setRunStatus(`${validation.join("\n")}\n\n正在按策略勾选消耗品…`);
+      prep = await selectPreparationItems(strategy, prep);
+    }
+    updateItemWarning(strategy, prep);
     const preparation = validatePreparation(strategy, prep);
     const combined = [...validation, ...preparation];
     const hasError = combined.some((line) => line.startsWith("错误"));
@@ -1085,6 +1310,13 @@
     return match ? Number(match[1]) - 1 : null;
   }
 
+  function readBattleSpeed() {
+    const button = [...document.querySelectorAll("button")].find((candidate) => {
+      return /战斗速度|戰鬥速度/.test(candidate.title || "");
+    });
+    return (button?.innerText || "").trim().replace(/\s+/g, " ");
+  }
+
   function updateRunningStatus(snapshot) {
     const policy = executor.policy;
     const counts = policy.priority
@@ -1093,7 +1325,12 @@
     const sequence = policy.deploySequence.length
       ? `  序列 ${executor.sequenceIndex}/${policy.deploySequence.length}`
       : "";
-    const status = `运行中 t=${snapshot.time.toFixed(2)}s  钱包 ${snapshot.walletLevel}/${policy.walletTarget}${sequence}  金币 ${Math.floor(snapshot.money)}  场上 ${snapshot.cats}/20\n${counts}`;
+    const speed = readBattleSpeed();
+    const speedText = speed ? `  速度 ${speed}` : "";
+    const speedWarning = speed && !/^1\s*[×x]$/i.test(speed)
+      ? `\n提示：当前为 ${speed} 倍速；动作节流按真实时间，精确复刻建议 1×。`
+      : "";
+    const status = `运行中 t=${snapshot.time.toFixed(2)}s  钱包 ${snapshot.walletLevel}/${policy.walletTarget}${sequence}  金币 ${Math.floor(snapshot.money)}  场上 ${snapshot.cats}/20${speedText}\n${counts}${speedWarning}`;
     if (status !== executor.lastStatus) {
       executor.lastStatus = status;
       setRunStatus(status);
