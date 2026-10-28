@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         喵喵的逆袭 · 数据导出与策略执行
 // @namespace    https://github.com/ZeroJehovah/ilovecat-battle-sim
-// @version      0.1.5
+// @version      0.1.6
 // @description  只读导出战斗数据与当前 JS，并按 JSON 策略操作战斗页面
 // @match        https://api.ilovecat520.me/*
 // @updateURL    https://raw.githubusercontent.com/ZeroJehovah/ilovecat-battle-sim/main/tools/ilovecat-workbench.user.js
@@ -15,10 +15,11 @@
 
   const STRATEGY_FORMAT = "ilovecat-battle-strategy";
   const EXPORT_FORMAT = "ilovecat-game-export";
-  const USERSCRIPT_VERSION = "0.1.5";
+  const USERSCRIPT_VERSION = "0.1.6";
   const STORAGE_KEY = "ilovecat-workbench-strategy";
   const ACTION_GAP_MS = 250;
   const LOOP_MS = 100;
+  const BATTLE_START_TIMEOUT_MS = 20000;
   const CANNON_READY = 1;
 
   let executor = null;
@@ -122,9 +123,10 @@
           <pre class="status export-status">尚未读取。</pre>
         </div>
         <div class="view" data-view="execute" hidden>
-          <p class="muted">先按策略配置好队伍和道具并开始战斗，再把策略 JSON 粘贴到这里。执行器从 React 战斗快照读取金币、存活数量和冷却，通过页面按钮操作；不会直接修改战斗状态。</p>
+          <p class="muted">先按策略配置好队伍和道具，再把策略 JSON 粘贴到这里。已在战斗中时直接执行；停留在“出战”准备界面时，可授权脚本点击“开始战斗”。执行器从 React 战斗快照读取金币、存活数量和冷却，通过页面按钮操作；不会直接修改战斗状态。</p>
           <textarea spellcheck="false" placeholder="粘贴 ilovecat-battle-strategy JSON"></textarea>
           <input class="strategy-file" type="file" accept=".json,application/json" hidden>
+          <label class="check warning"><input class="auto-start" type="checkbox"> 无战斗时由脚本点击“开始战斗”（消耗 1 次挑战）</label>
           <div class="actions">
             <button class="load-strategy">导入 JSON 文件</button>
             <button class="validate">校验</button>
@@ -132,7 +134,7 @@
             <button class="danger stop">停止</button>
           </div>
           <pre class="status run-status">未执行。</pre>
-          <p class="muted warning">执行器不能选择服务器种子，也不能保证与离线模拟逐帧一致。刷新、切页或改动战斗 DOM 可能导致停止。</p>
+          <p class="muted warning">自动开战只会在关卡名称、队伍前几槽和道具都与策略一致时点击准备界面的“开始战斗”；不会调整队伍、使用道具或选择服务器种子。点击后仍有少量网络与渲染延迟。</p>
         </div>
       </section>`;
     return {
@@ -151,6 +153,7 @@
       exportStatus: root.querySelector(".export-status"),
       strategy: root.querySelector('[data-view="execute"] textarea'),
       strategyFile: root.querySelector(".strategy-file"),
+      autoStart: root.querySelector(".auto-start"),
       loadStrategy: root.querySelector(".load-strategy"),
       validate: root.querySelector(".validate"),
       run: root.querySelector(".run"),
@@ -597,9 +600,19 @@
     const strategy = parseStrategy(ui.strategy.value);
     saveStorage(ui.strategy.value);
     const runtime = findBattleRuntime();
-    const messages = validateStrategy(strategy, runtime);
+    const active = isActiveRuntime(runtime) ? runtime : { context: null, snapshot: null };
+    const messages = validateStrategy(strategy, active);
+    if (!active.context) {
+      const prep = findPreparationRuntime(strategy);
+      if (prep) messages.push(...validatePreparation(strategy, prep));
+      else messages.push("提示：没有找到与策略关卡名称匹配的“出战”准备界面。");
+    }
     setRunStatus(messages.join("\n"), messages.some((line) => line.startsWith("错误")));
     return strategy;
+  }
+
+  function isActiveRuntime(runtime) {
+    return Boolean(runtime.context && runtime.snapshot && runtime.snapshot.result === "playing");
   }
 
   function validateStrategy(strategy, runtime) {
@@ -655,19 +668,183 @@
     return messages;
   }
 
+  function findPreparationRuntime(strategy) {
+    const stageName = typeof strategy.stage?.name === "string" ? strategy.stage.name.trim() : "";
+    if (!stageName) return null;
+    const dialogs = [...document.querySelectorAll('[role="dialog"], .snowapi-dialog-content')];
+    const seen = new Set();
+    for (const dialog of dialogs) {
+      if (seen.has(dialog) || !(dialog.offsetWidth || dialog.offsetHeight)) continue;
+      seen.add(dialog);
+      const title = dialog.querySelector('[data-slot="dialog-title"], h2')?.textContent?.trim() || "";
+      if (!title.includes(stageName)) continue;
+      const startButton = [...dialog.querySelectorAll("button")].find((button) => {
+        if (button.disabled || !(button.offsetWidth || button.offsetHeight)) return false;
+        return /^(?:开始战斗|開始戰鬥|开始挑战|開始挑戰)$/.test(button.innerText.trim());
+      });
+      if (!startButton) continue;
+      const meta = readPreparationMeta(startButton, dialog, title);
+      if (meta) return { dialog, startButton, ...meta };
+    }
+    return null;
+  }
+
+  function readPreparationMeta(startButton, dialog, title) {
+    const fiberKey = Object.keys(startButton).find((key) => key.startsWith("__reactFiber$"));
+    if (!fiberKey) return null;
+    let fiber = startButton[fiberKey];
+    let props = null;
+    let depth = 0;
+    while (fiber && depth++ < 45) {
+      const candidate = fiber.memoizedProps;
+      if (candidate && typeof candidate === "object" &&
+          candidate.catalog && candidate.state &&
+          Array.isArray(candidate.team) && typeof candidate.onStart === "function") {
+        props = candidate;
+        break;
+      }
+      fiber = fiber.return;
+    }
+    if (!props) return null;
+
+    const cats = new Map((props.catalog.cats ?? []).map((cat) => [String(cat.id), cat]));
+    const units = new Map((props.state.units ?? []).map((unit) => [String(unit.cat_id), unit]));
+    const team = props.team.map((id, slot) => {
+      const key = String(id);
+      const cat = cats.get(key);
+      const unit = units.get(key);
+      return {
+        slot,
+        id: key,
+        name: String(cat?.name ?? key),
+        level: Number(unit?.level ?? 1),
+      };
+    });
+    const items = [...dialog.querySelectorAll("label.cat-battle-item-pick")].map((label) => {
+      const input = label.querySelector('input[type="checkbox"]');
+      const src = label.querySelector("img")?.getAttribute("src") || "";
+      const id = (src.match(/item-([a-z0-9_]+)\.webp/i) ?? [])[1] || "";
+      const countText = [...label.querySelectorAll("span")].at(-1)?.textContent || "";
+      const count = Number((countText.match(/×\s*(\d+)/) ?? [])[1] ?? 0);
+      return {
+        id,
+        name: label.querySelector(".font-medium")?.textContent?.trim() || id,
+        count,
+        selected: Boolean(input?.checked),
+      };
+    }).filter((item) => item.id);
+    return {
+      title,
+      team,
+      items,
+      starting: Boolean(props.starting),
+    };
+  }
+
+  function validatePreparation(strategy, prep) {
+    const messages = [`准备界面：${prep.title}`];
+    let hasError = false;
+    const expectedTeam = Array.isArray(strategy.team) ? strategy.team : [];
+
+    if (expectedTeam.length) {
+      const actualIds = prep.team.map((entry) => entry.id);
+      const expectedIds = expectedTeam.map((entry) => entry.id);
+      const prefixMatches = expectedIds.every((id, index) => actualIds[index] === id);
+      if (!prefixMatches) {
+        messages.push(`错误：准备队伍前 ${expectedIds.length} 槽应为 ${expectedIds.join(" / ")}，当前 ${actualIds.slice(0, Math.max(4, expectedIds.length)).join(" / ") || "空"}。请先点“调整队伍”保存策略顺序。`);
+        hasError = true;
+      } else {
+        messages.push(`队伍：${expectedIds.join(" / ")}（前 ${expectedIds.length} 槽匹配）`);
+      }
+      const actualLevels = new Map(prep.team.map((entry) => [entry.id, entry.level]));
+      const levelMismatch = expectedTeam.filter((entry) => Number(entry.level) !== actualLevels.get(entry.id));
+      if (levelMismatch.length) {
+        messages.push(`警告：准备等级不一致：${levelMismatch.map((entry) => `${entry.id} 需要 ${entry.level}，当前 ${actualLevels.get(entry.id) ?? "未知"}`).join("；")}。`);
+      }
+    }
+
+    const expectedItems = new Set((Array.isArray(strategy.items) ? strategy.items : []).map(String));
+    const selectedItems = prep.items.filter((item) => item.selected);
+    const missing = [...expectedItems].filter((id) => !selectedItems.some((item) => item.id === id));
+    const extra = selectedItems.filter((item) => !expectedItems.has(item.id));
+    const unavailable = [...expectedItems].filter((id) => {
+      const item = prep.items.find((entry) => entry.id === id);
+      return !item || item.count <= 0;
+    });
+    if (missing.length || extra.length || unavailable.length) {
+      messages.push(`错误：准备道具不一致。缺少 ${missing.join(", ") || "无"}；多选 ${extra.map((item) => item.id).join(", ") || "无"}；库存不足 ${unavailable.join(", ") || "无"}。`);
+      hasError = true;
+    } else {
+      messages.push(`道具：${selectedItems.length ? selectedItems.map((item) => item.name).join("、") : "未使用"}。`);
+    }
+
+    messages.push(hasError ? "准备校验失败，未点击开始战斗。" : "准备校验通过。");
+    return messages;
+  }
+
   async function startFromUi() {
     const strategy = parseStrategy(ui.strategy.value);
     saveStorage(ui.strategy.value);
     const runtime = findBattleRuntime();
-    const validation = validateStrategy(strategy, runtime);
+    const active = isActiveRuntime(runtime) ? runtime : { context: null, snapshot: null };
+    const validation = validateStrategy(strategy, active);
     setRunStatus(validation.join("\n"), validation.some((line) => line.startsWith("错误")));
-    if (validation.some((line) => line.startsWith("错误"))) throw new Error("策略校验失败，未开始执行。");
-    if (!runtime.context || !runtime.snapshot) throw new Error("当前没有进行中的战斗，请先开始战斗。");
+    if (validation.some((line) => line.startsWith("错误"))) {
+      throw new Error(validation.join("\n") || "策略校验失败，未开始执行。");
+    }
+
+    if (active.context) {
+      startExecutor(strategy, active);
+      return;
+    }
+
+    if (!ui.autoStart.checked) {
+      throw new Error("当前没有进行中的战斗。勾选“无战斗时由脚本点击开始战斗”，或先手动开始战斗。");
+    }
+
+    const prep = findPreparationRuntime(strategy);
+    if (!prep) throw new Error("没有找到与策略关卡名称匹配的“出战”准备界面。请先打开对应关卡准备界面。");
+    const preparation = validatePreparation(strategy, prep);
+    const combined = [...validation, ...preparation];
+    const hasError = combined.some((line) => line.startsWith("错误"));
+    setRunStatus(combined.join("\n"), hasError);
+    if (hasError) {
+      throw new Error(combined.join("\n") || "准备校验失败，未点击开始战斗。");
+    }
+
+    stopExecutor("", false);
+    executor = {
+      strategy,
+      policy: strategy.policy,
+      context: null,
+      expectedStageId: Number(strategy.stageId),
+      waitingForBattle: true,
+      waitStartedAt: performance.now(),
+      actionIndex: 0,
+      sequenceIndex: 0,
+      opened: new Set(),
+      nextActionAt: 0,
+      lastStatus: "",
+      lastTime: 0,
+      staleSince: performance.now(),
+      timer: null,
+      stopped: false,
+    };
+    ui.run.disabled = true;
+    ui.validate.disabled = true;
+    executor.timer = setInterval(executeTick, LOOP_MS);
+    setRunStatus(`${combined.join("\n")}\n\n正在点击“开始战斗”…`);
+    prep.startButton.click();
+  }
+
+  function startExecutor(strategy, runtime) {
     stopExecutor("", false);
     executor = {
       strategy,
       policy: strategy.policy,
       context: runtime.context,
+      expectedStageId: Number(strategy.stageId),
+      waitingForBattle: false,
       actionIndex: 0,
       sequenceIndex: 0,
       opened: new Set(),
@@ -697,7 +874,31 @@
     if (executor?.stopped) return;
     try {
       if (!executor.strategy) return;
-      const runtime = findBattleRuntime();
+
+      if (executor.waitingForBattle) {
+        const started = findBattleRuntime(executor.expectedStageId, { requirePlaying: true });
+        if (!started.context || !started.snapshot) {
+          if (performance.now() - executor.waitStartedAt > BATTLE_START_TIMEOUT_MS) {
+            stopExecutor("已点击开始战斗，但 20 秒内没有检测到战斗开始。若页面出现错误，请处理后重试。");
+          } else {
+            setRunStatus("已点击开始战斗，等待战斗快照…");
+          }
+          return;
+        }
+        const liveMessages = validateStrategy(executor.strategy, started);
+        if (liveMessages.some((line) => line.startsWith("错误"))) {
+          stopExecutor(`战斗已开始，但实时校验失败：\n${liveMessages.join("\n")}`);
+          return;
+        }
+        executor.context = started.context;
+        executor.waitingForBattle = false;
+        executor.lastTime = started.snapshot.time;
+        executor.staleSince = performance.now();
+        executor.nextActionAt = 0;
+        setRunStatus("战斗已开始，开始执行。");
+      }
+
+      const runtime = findBattleRuntime(executor.expectedStageId);
       if (!runtime.snapshot || !runtime.context) {
         stopExecutor("战斗快照消失，执行器已停止。");
         return;
@@ -899,9 +1100,19 @@
     }
   }
 
-  function findBattleRuntime() {
-    const screen = document.querySelector(".cat-battle-screen");
-    if (!screen) return { context: null, snapshot: null };
+  function findBattleRuntime(expectedStageId = null, { requirePlaying = false } = {}) {
+    const screens = [...document.querySelectorAll(".cat-battle-screen")];
+    for (const screen of screens) {
+      const runtime = readBattleRuntime(screen);
+      if (!runtime.context) continue;
+      if (expectedStageId != null && Number(runtime.context.stageId) !== Number(expectedStageId)) continue;
+      if (requirePlaying && runtime.snapshot?.result !== "playing") continue;
+      return runtime;
+    }
+    return { context: null, snapshot: null };
+  }
+
+  function readBattleRuntime(screen) {
     const fiberKey = Object.keys(screen).find((key) => key.startsWith("__reactFiber$"));
     if (!fiberKey) return { context: null, snapshot: null };
     let context = null;
