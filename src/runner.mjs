@@ -1,4 +1,4 @@
-import { BattleEngine } from "./engine.mjs";
+import { BattleEngine, STEP } from "./engine.mjs";
 
 function unique(values) {
   return [...new Set(values)];
@@ -76,7 +76,7 @@ export class AutoPolicy {
   }
 
   applyScheduled(engine) {
-    while (this.nextAction < this.actions.length && Number(this.actions[this.nextAction].at) <= engine.time) {
+    while (this.nextAction < this.actions.length && Number(this.actions[this.nextAction].at) <= engine.time + 1e-9) {
       const action = this.actions[this.nextAction++];
       if (action.type === "deploy") {
         this.deployId(engine, action.id);
@@ -142,6 +142,7 @@ export function simulate({
   policy = {},
   maxTime = null,
   recordEvents = false,
+  recordActions = false,
 }) {
   if (!snapshot?.catalog) throw new Error("snapshot.catalog is required");
   const normalizedTeam = normalizeTeam(snapshot.catalog, team);
@@ -181,6 +182,12 @@ export function simulate({
     telemetry: engine.telemetry,
     deaths: engine.deaths,
     actions: engine.actions.length,
+    actionLog: recordActions
+      ? engine.actions.map(({ tick, ...action }) => ({
+          at: Number((tick * STEP).toFixed(2)),
+          ...action,
+        }))
+      : undefined,
     events: recordEvents ? events : undefined,
   };
 }

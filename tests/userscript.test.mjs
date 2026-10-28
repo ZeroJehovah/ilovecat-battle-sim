@@ -14,6 +14,8 @@ test("the userscript is syntactically valid and exposes both workflows", () => {
   assert.match(source, /ilovecat-battle-strategy/);
   assert.match(source, /battleBundles/);
   assert.match(source, /fallbackPriority/);
+  assert.match(source, /strictTimeline/);
+  assert.match(source, /scheduleMiss/);
 });
 
 test("the userscript does not submit data or export unrelated account state", () => {

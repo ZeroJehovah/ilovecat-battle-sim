@@ -73,11 +73,16 @@ Supported types are `deploy`, `wallet`, `cannon`, and `wait`. Failed actions rem
 
 ```bash
 node src/cli.mjs run scenario.json --seed 7 --events
+node src/cli.mjs run scenario.json --seed 7 --trace --output trace.json
 node src/cli.mjs batch scenario.json --seed-start 1 --runs 100 --jobs 8
 node src/cli.mjs compare scenarios.json --runs 50 --jobs 8 --output result.md
 node src/cli.mjs cats --tier S
 node src/cli.mjs waves --stage-id 9101 --output /tmp/waves.json
 ```
+
+`--trace` adds `actionLog` to a single-run JSON result. Each entry uses the original `0.02`-second tick converted to seconds.
+
+Copying that array into `policy.actions` with `automatic: false` reproduces the run under the same source, snapshot, and seed; a tiny clock tolerance prevents decimal `at` values from slipping one frame.
 
 `--format` accepts `json`, `table`, or `markdown`. An `.md` output path selects Markdown automatically. `--summary-only` removes per-run objects from batch/compare JSON.
 
@@ -93,6 +98,7 @@ A single run reports:
 - `telemetry`: damage, kills, healing, deployment counts, deaths, maximum simultaneous copies, and first deployment/death times by cat id.
 - `deaths`: individual cat loss timestamps and positions.
 - `events`: only with `--events`; useful for precise hit/heal/freeze/rage timing.
+- `actionLog`: only with `--trace`; every deploy, wallet, and cannon action with its battle-clock time.
 
 Batch output adds mean, minimum, P10, median, P90, maximum, result counts, and round counts. Compare uses one shared seed range for every candidate.
 

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         喵喵的逆袭 · 数据导出与策略执行
 // @namespace    https://github.com/ZeroJehovah/ilovecat-battle-sim
-// @version      0.1.0
+// @version      0.1.1
 // @description  只读导出战斗数据与当前 JS，并按 JSON 策略操作战斗页面
 // @match        https://api.ilovecat520.me/*
 // @grant        none
@@ -487,6 +487,10 @@
     policy.economyFirst = policy.economyFirst !== false;
     policy.autoCannon = Boolean(policy.autoCannon);
     policy.automatic = policy.automatic !== false;
+    policy.strictTimeline = Boolean(policy.strictTimeline);
+    policy.timelineTolerance = policy.timelineTolerance == null
+      ? 0.25
+      : finiteNumber(policy.timelineTolerance, "policy.timelineTolerance");
     policy.openers = stringArray(policy.openers ?? [], "policy.openers");
     policy.priority = stringArray(policy.priority ?? [], "policy.priority");
     policy.fallbackPriority = stringArray(policy.fallbackPriority ?? [], "policy.fallbackPriority");
@@ -688,6 +692,7 @@
         return;
       }
       const acted = decideAndAct(snapshot, runtime.context);
+      if (!executor || executor.stopped) return;
       if (acted) executor.nextActionAt = performance.now() + ACTION_GAP_MS;
       updateRunningStatus(snapshot);
     } catch (error) {
@@ -699,16 +704,30 @@
     const policy = executor.policy;
     while (executor.actionIndex < policy.actions.length && policy.actions[executor.actionIndex].at <= snapshot.time) {
       const action = policy.actions[executor.actionIndex];
-      if (action.type === "deploy") {
-        const outcome = clickCardForId(action.id, context);
-        if (outcome === "page") return true;
+      if (action.type === "wait") {
         executor.actionIndex++;
-        return outcome;
+        return true;
+      }
+      if (action.type === "deploy") {
+        const outcome = tryDeploy(action.id, snapshot, context);
+        if (outcome === "page") return true;
+        if (outcome !== true) return scheduleMiss(snapshot, action);
+        executor.actionIndex++;
+        return true;
+      }
+      if (action.type === "wallet") {
+        if (snapshot.walletLevel >= 8 || snapshot.money < snapshot.walletCost) {
+          return scheduleMiss(snapshot, action);
+        }
+        if (!clickWallet()) return scheduleMiss(snapshot, action);
+        executor.actionIndex++;
+        return true;
+      }
+      if (snapshot.cannon < CANNON_READY || !clickCannon()) {
+        return scheduleMiss(snapshot, action);
       }
       executor.actionIndex++;
-      if (action.type === "wait") return true;
-      if (action.type === "wallet") return clickWallet();
-      if (action.type === "cannon") return clickCannon();
+      return true;
     }
     if (!policy.automatic) return false;
 
@@ -743,6 +762,18 @@
       }
     }
     return policy.autoCannon && snapshot.cannon >= CANNON_READY ? clickCannon() : false;
+  }
+
+  function scheduleMiss(snapshot, action) {
+    const policy = executor.policy;
+    const late = snapshot.time - action.at;
+    if (policy.strictTimeline && late > policy.timelineTolerance) {
+      const label = action.id ? ` ${action.id}` : "";
+      stopExecutor(`定时动作错过：${action.type}${label} @ ${action.at.toFixed(2)}s，当前 ${snapshot.time.toFixed(2)}s。`);
+    } else if (!policy.strictTimeline && late > policy.timelineTolerance) {
+      executor.actionIndex++;
+    }
+    return false;
   }
 
   function tryDeploy(id, snapshot, context) {

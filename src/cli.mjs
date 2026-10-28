@@ -26,6 +26,7 @@ Options:
   --runs <n>           Number of seeds for batch/compare (default: 30)
   --jobs <n>           Worker count (default: min(runs, CPUs))
   --events             Include combat event log for "run"
+  --trace              Include exact 0.02s action timeline for "run"
   --tier <tier>        Filter the "cats" command by tier
   --format <name>      json, markdown, or table (default: json, or by .md output)
   --output <path>      Also write the result to a file
@@ -37,7 +38,7 @@ function parseArgs(argv) {
   const [command, ...rest] = argv;
   const options = {};
   const positional = [];
-  const booleans = new Set(["events", "summary-only", "help"]);
+  const booleans = new Set(["events", "trace", "summary-only", "help"]);
   for (let index = 0; index < rest.length; index++) {
     const token = rest[index];
     if (token === "-h" || token === "--help") {
@@ -147,6 +148,7 @@ async function commandRun(snapshot, scenario, options) {
     policy: scenario.policy ?? {},
     seed: Number(options.seed ?? scenario.seed ?? 1),
     recordEvents: Boolean(options.events),
+    recordActions: Boolean(options.trace),
     ...context,
   });
   const payload = { name: scenario.name ?? "scenario", ...result };

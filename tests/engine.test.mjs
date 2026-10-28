@@ -171,6 +171,43 @@ test("scheduled deploy and wallet actions run without automatic fill", () => {
   assert.equal(result.actions, 2);
 });
 
+test("a recorded action log replays exactly", () => {
+  const team = [
+    { id: "c2", level: 1 },
+    { id: "c1", level: 1 },
+  ];
+  const first = simulate({
+    snapshot,
+    team,
+    stageId: 9101,
+    seed: 1,
+    maxTime: 30,
+    policy: {
+      walletTarget: 2,
+      openers: ["c2"],
+      priority: ["c1"],
+      targetCounts: { c1: 0 },
+      autoCannon: true,
+    },
+    recordActions: true,
+  });
+  const replay = simulate({
+    snapshot,
+    team,
+    stageId: 9101,
+    seed: 1,
+    maxTime: 30,
+    policy: {
+      automatic: false,
+      actions: first.actionLog,
+    },
+    recordActions: true,
+  });
+  assert.deepEqual(replay.actionLog, first.actionLog);
+  assert.equal(replay.duration, first.duration);
+  assert.equal(replay.result, first.result);
+});
+
 test("the bundled endless example reproduces the expected late-round survival band", async () => {
   const scenario = JSON.parse(
     await readFile(new URL("../examples/endless-current.json", import.meta.url), "utf8"),
