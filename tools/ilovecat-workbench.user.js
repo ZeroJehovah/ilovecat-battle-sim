@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         喵喵的逆袭 · 数据导出与策略执行
 // @namespace    https://github.com/ZeroJehovah/ilovecat-battle-sim
-// @version      0.1.3
+// @version      0.1.4
 // @description  只读导出战斗数据与当前 JS，并按 JSON 策略操作战斗页面
 // @match        https://api.ilovecat520.me/*
 // @grant        none
@@ -146,7 +146,7 @@
       copyFallback: root.querySelector(".copy-fallback"),
       copyFallbackText: root.querySelector(".copy-fallback textarea"),
       exportStatus: root.querySelector(".export-status"),
-      strategy: root.querySelector("textarea"),
+      strategy: root.querySelector('[data-view="execute"] textarea'),
       strategyFile: root.querySelector(".strategy-file"),
       loadStrategy: root.querySelector(".load-strategy"),
       validate: root.querySelector(".validate"),

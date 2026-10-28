@@ -18,6 +18,7 @@ test("the userscript is syntactically valid and exposes both workflows", () => {
   assert.match(source, /sequenceIndex/);
   assert.match(source, /导入 JSON 文件/);
   assert.match(source, /strategyFile/);
+  assert.match(source, /strategy:\s*root\.querySelector\('\[data-view="execute"\] textarea'\)/);
   assert.match(source, /strictTimeline/);
   assert.match(source, /scheduleMiss/);
 });
