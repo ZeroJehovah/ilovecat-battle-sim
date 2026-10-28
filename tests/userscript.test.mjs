@@ -16,6 +16,8 @@ test("the userscript is syntactically valid and exposes both workflows", () => {
   assert.match(source, /fallbackPriority/);
   assert.match(source, /deploySequence/);
   assert.match(source, /sequenceIndex/);
+  assert.match(source, /导入 JSON 文件/);
+  assert.match(source, /strategyFile/);
   assert.match(source, /strictTimeline/);
   assert.match(source, /scheduleMiss/);
 });

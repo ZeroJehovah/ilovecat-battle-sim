@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         喵喵的逆袭 · 数据导出与策略执行
 // @namespace    https://github.com/ZeroJehovah/ilovecat-battle-sim
-// @version      0.1.2
+// @version      0.1.3
 // @description  只读导出战斗数据与当前 JS，并按 JSON 策略操作战斗页面
 // @match        https://api.ilovecat520.me/*
 // @grant        none
@@ -85,6 +85,7 @@
           border: 1px solid #4e5866; background: #0e1218; color: #e8eef6;
           padding: 10px; font: 12px/1.5 ui-monospace, SFMono-Regular, Consolas, monospace;
         }
+        input[type="file"][hidden] { display: none !important; }
         .warning { color: #f4ca7c; }
         .copy-fallback[hidden] { display: none !important; }
         .copy-fallback { margin-top: 10px; }
@@ -120,7 +121,9 @@
         <div class="view" data-view="execute" hidden>
           <p class="muted">先按策略配置好队伍和道具并开始战斗，再把策略 JSON 粘贴到这里。执行器从 React 战斗快照读取金币、存活数量和冷却，通过页面按钮操作；不会直接修改战斗状态。</p>
           <textarea spellcheck="false" placeholder="粘贴 ilovecat-battle-strategy JSON"></textarea>
+          <input class="strategy-file" type="file" accept=".json,application/json" hidden>
           <div class="actions">
+            <button class="load-strategy">导入 JSON 文件</button>
             <button class="validate">校验</button>
             <button class="primary run">开始执行</button>
             <button class="danger stop">停止</button>
@@ -144,6 +147,8 @@
       copyFallbackText: root.querySelector(".copy-fallback textarea"),
       exportStatus: root.querySelector(".export-status"),
       strategy: root.querySelector("textarea"),
+      strategyFile: root.querySelector(".strategy-file"),
+      loadStrategy: root.querySelector(".load-strategy"),
       validate: root.querySelector(".validate"),
       run: root.querySelector(".run"),
       stop: root.querySelector(".stop"),
@@ -188,6 +193,16 @@
       setExportStatus(`已下载可直接用于模拟器的 snapshot.json（${formatBytes(text.length)}）。`);
     }));
     ui.validate.addEventListener("click", () => runBusy(() => validateFromUi()));
+    ui.loadStrategy.addEventListener("click", () => ui.strategyFile.click());
+    ui.strategyFile.addEventListener("change", () => runBusy(async () => {
+      const file = ui.strategyFile.files?.[0];
+      if (!file) return;
+      const text = await file.text();
+      ui.strategy.value = text;
+      saveStorage(text);
+      setRunStatus(`已载入 ${file.name}（${text.length} 个字符）。请点击“校验”。`);
+      ui.strategyFile.value = "";
+    }));
     ui.run.addEventListener("click", () => runBusy(() => startFromUi()));
     ui.stop.addEventListener("click", () => stopExecutor("用户停止。"));
   }
@@ -476,7 +491,11 @@
     try {
       value = JSON.parse(rawText);
     } catch (error) {
-      throw new Error(`策略不是合法 JSON：${error.message}`);
+      const detail = error instanceof Error ? error.message : String(error);
+      const hint = /unexpected end/i.test(detail)
+        ? `（当前输入 ${rawText.length} 个字符；请从第一个 { 复制到最后一个 }，或使用“导入 JSON 文件”）`
+        : "";
+      throw new Error(`策略不是合法 JSON：${detail}${hint}`);
     }
     if (!value || value.format !== STRATEGY_FORMAT || value.version !== 1) {
       throw new Error(`策略格式必须是 ${STRATEGY_FORMAT} 且 version=1。`);
