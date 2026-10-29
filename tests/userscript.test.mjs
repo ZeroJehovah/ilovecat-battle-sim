@@ -23,7 +23,7 @@ test("the userscript is syntactically valid and exposes both workflows", () => {
   assert.doesNotThrow(() => new Function(source));
   assert.match(source, /@match\s+https:\/\/api\.ilovecat520\.me\/\*/);
   assert.match(source, /@updateURL\s+https:\/\/raw\.githubusercontent\.com\/ZeroJehovah\/ilovecat-battle-sim\/main\/tools\/ilovecat-workbench\.user\.js/);
-  assert.match(source, /USERSCRIPT_VERSION = "0\.3\.8"/);
+  assert.match(source, /USERSCRIPT_VERSION = "0\.3\.9"/);
   assert.match(source, /<div class="title">喵喵的逆袭工具 <span class="version">v\$\{USERSCRIPT_VERSION\}<\/span><\/div>/);
   assert.match(source, /ilovecat-game-export/);
   assert.match(source, /ilovecat-battle-strategy/);
@@ -97,11 +97,15 @@ test("the userscript is syntactically valid and exposes both workflows", () => {
   assert.match(source, /js-enable/);
   assert.match(source, /JS源码<\/label>/);
   assert.doesNotMatch(source, /JS源码：/);
-  assert.match(source, /JS源码<\/label>[\s\S]*?value="battle" disabled> 战斗逻辑[\s\S]*?value="all" disabled> 全部/);
+  assert.match(source, /JS源码<\/label>[\s\S]*?value="battle"> 战斗逻辑[\s\S]*?value="all"> 全部/);
   assert.doesNotMatch(source, /value="none"/);
   assert.doesNotMatch(source, /include-catalog" type="checkbox" checked/);
-  assert.match(source, /ui\.fixedStages\.disabled = !ui\.fixedStageEnable\.checked/);
-  assert.match(source, /input\.disabled = !dailyEnabled/);
+  assert.doesNotMatch(source, /ui\.fixedStages\.disabled|input\.disabled = !dailyEnabled/);
+  assert.match(source, /ui\.fixedStageEnable\.checked = ui\.fixedStages\.value\.trim\(\) !== ""/);
+  assert.match(source, /ui\.jsEnable\.checked = ui\.jsScopes\.some\(\(input\) => input\.checked\)/);
+  assert.match(source, /dailyMaster\.checked = \[\.\.\.ui\.stageChoices\.querySelectorAll\("\.daily-difficulty-input"\)\]/);
+  assert.match(source, /ui\.fixedStages\.value = "";/);
+  assert.match(source, /for \(const input of ui\.jsScopes\) input\.checked = false;/);
   assert.match(source, /input\.checked = selectedBefore\.has\(entry\.key\)/);
   assert.match(source, /stageChoices\.querySelectorAll\("input\[data-stage-key\]:checked"\)/);
   assert.doesNotMatch(source, /!hadOptions|previouslyAll/);
