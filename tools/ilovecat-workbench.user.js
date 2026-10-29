@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         喵喵的逆袭 · 数据导出与策略执行
 // @namespace    https://github.com/ZeroJehovah/ilovecat-battle-sim
-// @version      0.4.0
+// @version      0.5.0
 // @description  按范围只读导出战斗数据与 JS，并从在线索引或本地文件选择策略操作战斗页面
 // @match        https://api.ilovecat520.me/*
 // @updateURL    https://raw.githubusercontent.com/ZeroJehovah/ilovecat-battle-sim/main/tools/ilovecat-workbench.user.js
@@ -18,7 +18,7 @@
 
   const STRATEGY_FORMAT = "ilovecat-battle-strategy";
   const EXPORT_FORMAT = "ilovecat-game-export";
-  const USERSCRIPT_VERSION = "0.4.0";
+  const USERSCRIPT_VERSION = "0.5.0";
   const STRATEGY_INDEX_URL = "https://github.com/ZeroJehovah/ilovecat-battle-sim-docs/raw/main/strategies/index.json";
   const STRATEGY_INDEX_TTL_MS = 5 * 60 * 1000;
   const ACTION_GAP_MS = 250;
@@ -46,7 +46,9 @@
   let stageOptions = null;
   let stageOptionsPromise = null;
   let activeStrategyText = "";
+  let currentTab = "export";
   let selectedOnlineStrategyId = "";
+  let selectedOnlineStageId = "";
   let onlineStrategyIndex = null;
   let onlineStrategyIndexPromise = null;
   let onlineStrategyIndexLoadedAt = 0;
@@ -131,6 +133,19 @@
           border: 1px solid #5e513d; border-radius: 8px; background: #282f3a;
           color: #f7ead0; padding: 4px 8px; cursor: pointer; font-size: 11px;
         }
+        .stage-filter-block { display: flex; flex-direction: column; gap: 5px; }
+        .stage-filter-label { color: #b9ad98; font-size: 11px; }
+        .online-stage-filters { display: flex; flex-wrap: wrap; gap: 6px; }
+        .online-stage-filter {
+          border: 1px solid #4d5868; border-radius: 999px; background: #171e27;
+          color: #d8cdb9; padding: 3px 9px; cursor: pointer; font-size: 11px;
+          line-height: 18px;
+        }
+        .online-stage-filter.selected {
+          border-color: #f0b95c; background: #3a2c18; color: #ffe0a3;
+          font-weight: 700;
+        }
+        .online-stage-empty { color: #b9ad98; font-size: 11px; }
         .online-strategies {
           display: flex; flex-direction: column; gap: 7px; max-height: 250px;
           overflow: auto; padding-right: 2px;
@@ -151,6 +166,10 @@
           padding: 1px 6px; border: 1px solid #6d5c3e; border-radius: 999px;
           color: #e7c98f; font-size: 10px; line-height: 16px;
         }
+        .online-strategy-details {
+          display: flex; flex-direction: column; gap: 4px; padding-top: 5px;
+          border-top: 1px solid #4b402d;
+        }
         .online-strategy-meta { color: #b9ad98; font-size: 11px; line-height: 1.45; }
         .online-strategy-description { color: #d8cdb9; font-size: 11px; line-height: 1.55; }
         .online-strategy-empty {
@@ -162,12 +181,21 @@
           flex: 0 0 auto; border: 1px solid #5e513d; border-radius: 9px;
           background: #282f3a; color: #f7ead0; padding: 6px 9px; cursor: pointer;
         }
-        .strategy-origin {
+        .strategy-origin, .active-strategy-origin {
           min-width: 0; color: #e7c98f; font-size: 11px; line-height: 1.4;
           overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
         }
         .online-index-status { min-height: 18px; }
         .online-index-status.error { color: #ffaaa4; }
+        .local-file-status.error { color: #ffaaa4; }
+        .execution-panel {
+          margin-top: 10px; padding: 10px; border: 1px solid #3e4857;
+          border-radius: 11px; background: #11161d;
+        }
+        .execution-panel[hidden] { display: none !important; }
+        .active-strategy-origin {
+          padding-bottom: 7px; border-bottom: 1px solid #313946;
+        }
         .warning { color: #f4ca7c; }
         .scope-card {
           display: flex; flex-direction: column; gap: 6px;
@@ -270,7 +298,8 @@
         </div>
         <div class="tabs">
           <button data-tab="export" class="active">导出数据</button>
-          <button data-tab="execute">执行策略</button>
+          <button data-tab="online">在线策略</button>
+          <button data-tab="local">本地策略</button>
         </div>
         <div class="view" data-view="export">
           <div class="scope-card">
@@ -296,29 +325,45 @@
           </div>
           <pre class="status export-status">尚未读取。</pre>
         </div>
-        <div class="view" data-view="execute" hidden>
-          <input class="strategy-file" type="file" accept=".json,application/json" hidden>
+        <div class="view" data-view="online" hidden>
           <div class="strategy-source">
             <div class="strategy-source-head">
               <span class="strategy-source-title">在线策略</span>
               <button class="refresh-strategies" type="button">刷新</button>
             </div>
+            <div class="stage-filter-block">
+              <span class="stage-filter-label">按关卡筛选</span>
+              <div class="online-stage-filters" role="tablist" aria-label="在线策略关卡筛选">
+                <span class="online-stage-empty">加载后显示支持的关卡</span>
+              </div>
+            </div>
             <div class="online-strategies" role="listbox" aria-label="在线策略列表">
               <div class="online-strategy-empty">打开此页后自动加载，请稍候。</div>
             </div>
             <div class="online-index-status muted" aria-live="polite">尚未加载在线策略。</div>
+          </div>
+        </div>
+        <div class="view" data-view="local" hidden>
+          <input class="strategy-file" type="file" accept=".json,application/json" hidden>
+          <div class="strategy-source">
+            <div class="strategy-source-head">
+              <span class="strategy-source-title">本地策略</span>
+            </div>
             <div class="local-strategy">
               <button class="load-strategy" type="button">选择本地 JSON</button>
-              <span class="strategy-origin">未选择策略</span>
+              <span class="local-file-status strategy-origin">未选择文件</span>
             </div>
+            <div class="muted">选择文件后会自动读取并校验，不需要再点校验。</div>
           </div>
+        </div>
+        <div class="execution-panel" hidden>
+          <div class="active-strategy-origin">当前策略：未选择</div>
           <div class="execute-options">
             <label class="check warning"><input class="auto-start" type="checkbox"> 自动开始战斗</label>
             <label class="check"><input class="auto-speed" type="checkbox"> 自动倍速</label>
           </div>
           <p class="item-warning" hidden></p>
           <div class="actions">
-            <button class="validate" type="button">校验</button>
             <button class="primary run" type="button">开始执行</button>
             <button class="danger stop" type="button">停止</button>
           </div>
@@ -350,15 +395,17 @@
       copyFallbackText: root.querySelector(".copy-fallback textarea"),
       exportStatus: root.querySelector(".export-status"),
       strategyFile: root.querySelector(".strategy-file"),
+      onlineStageFilters: root.querySelector(".online-stage-filters"),
       onlineStrategies: root.querySelector(".online-strategies"),
       onlineIndexStatus: root.querySelector(".online-index-status"),
       refreshStrategies: root.querySelector(".refresh-strategies"),
-      strategyOrigin: root.querySelector(".strategy-origin"),
+      localFileStatus: root.querySelector(".local-file-status"),
+      activeStrategyOrigin: root.querySelector(".active-strategy-origin"),
+      executionPanel: root.querySelector(".execution-panel"),
       autoStart: root.querySelector(".auto-start"),
       autoSpeed: root.querySelector(".auto-speed"),
       itemWarning: root.querySelector(".item-warning"),
       loadStrategy: root.querySelector(".load-strategy"),
-      validate: root.querySelector(".validate"),
       run: root.querySelector(".run"),
       stop: root.querySelector(".stop"),
       summaryName: root.querySelector(".strategy-summary-name"),
@@ -372,11 +419,7 @@
     ui.launcher.addEventListener("click", () => {
       ui.panel.hidden = !ui.panel.hidden;
       if (ui.panel.hidden) return;
-      if (!ui.views.find((view) => view.dataset.view === "export").hidden) {
-        ensureStageOptions().catch((error) => setExportStatus(error.message, true));
-      } else {
-        ensureOnlineStrategies().catch(() => {});
-      }
+      showTab(currentTab);
     });
     ui.close.addEventListener("click", () => {
       ui.panel.hidden = true;
@@ -449,18 +492,27 @@
       syncExportControlState();
       updateExportControls();
     });
-    ui.validate.addEventListener("click", () => runBusy(() => validateFromUi()));
     ui.loadStrategy.addEventListener("click", () => ui.strategyFile.click());
     ui.strategyFile.addEventListener("change", () => runBusy(async () => {
       const file = ui.strategyFile.files?.[0];
       if (!file) return;
       ui.strategyFile.value = "";
-      if (file.size > 2 * 1024 * 1024) throw new Error("策略文件超过 2 MiB，已拒绝读取。");
-      const text = await file.text();
-      parseStrategy(text);
-      setActiveStrategy(text, file.name);
-      setRunStatus(`已载入本地文件 ${file.name}，正在校验。`);
-      await validateFromUi();
+      ui.localFileStatus.classList.remove("error");
+      ui.localFileStatus.textContent = `正在读取 ${file.name}…`;
+      ui.localFileStatus.title = file.name;
+      try {
+        if (file.size > 2 * 1024 * 1024) throw new Error("策略文件超过 2 MiB，已拒绝读取。");
+        const text = await file.text();
+        parseStrategy(text);
+        setActiveStrategy(text, `本地 · ${file.name}`);
+        ui.localFileStatus.textContent = `已选择 ${file.name}`;
+        setRunStatus(`已载入本地文件 ${file.name}，正在自动校验。`);
+        await validateFromUi();
+      } catch (error) {
+        ui.localFileStatus.textContent = "本地文件读取或校验失败";
+        ui.localFileStatus.classList.add("error");
+        throw error;
+      }
     }));
     ui.refreshStrategies.addEventListener("click", () => runBusy(async () => {
       await ensureOnlineStrategies(true);
@@ -469,6 +521,11 @@
       const button = event.target.closest(".online-strategy");
       if (!button || !button.dataset.strategyId || busy || executor) return;
       runBusy(() => selectOnlineStrategy(button.dataset.strategyId));
+    });
+    ui.onlineStageFilters.addEventListener("click", (event) => {
+      const button = event.target.closest(".online-stage-filter");
+      if (!button || !button.dataset.stageId || busy || executor) return;
+      selectOnlineStage(button.dataset.stageId);
     });
     ui.run.addEventListener("click", () => runBusy(() => startFromUi()));
     ui.stop.addEventListener("click", () => stopExecutor("用户停止。"));
@@ -484,10 +541,12 @@
   }
 
   function showTab(name) {
+    currentTab = name;
     for (const tab of ui.tabs) tab.classList.toggle("active", tab.dataset.tab === name);
     for (const view of ui.views) view.hidden = view.dataset.view !== name;
+    ui.executionPanel.hidden = name === "export";
     if (name === "export") ensureStageOptions().catch((error) => setExportStatus(error.message, true));
-    if (name === "execute") ensureOnlineStrategies().catch(() => {});
+    if (name === "online") ensureOnlineStrategies().catch(() => {});
   }
 
   async function runBusy(task) {
@@ -516,21 +575,46 @@
     ui.loadStrategy.disabled = locked;
     ui.strategyFile.disabled = locked;
     ui.refreshStrategies.disabled = locked;
+    for (const button of ui.onlineStageFilters.querySelectorAll("button")) button.disabled = locked;
     for (const button of ui.onlineStrategies.querySelectorAll("button")) button.disabled = locked;
-    ui.validate.disabled = locked || !activeStrategyText;
+    ui.run.disabled = locked || !activeStrategyText;
+    ui.stop.disabled = !executor;
   }
 
   function setActiveStrategy(text, label, onlineId = "") {
     activeStrategyText = text;
     selectedOnlineStrategyId = onlineId;
-    ui.strategyOrigin.textContent = `已选择：${label}`;
-    ui.strategyOrigin.title = label;
+    ui.activeStrategyOrigin.textContent = `当前策略：${label}`;
+    ui.activeStrategyOrigin.title = label;
+    if (onlineId) {
+      ui.localFileStatus.textContent = "未选择文件";
+      ui.localFileStatus.removeAttribute("title");
+      ui.localFileStatus.classList.remove("error");
+    }
     for (const button of ui.onlineStrategies.querySelectorAll(".online-strategy")) {
       const selected = Boolean(onlineId) && button.dataset.strategyId === onlineId;
       button.classList.toggle("selected", selected);
       button.setAttribute("aria-selected", String(selected));
+      if (!selected) button.querySelector(".online-strategy-details")?.remove();
     }
     clearStrategySummary();
+    syncStrategyControls();
+  }
+
+  function clearActiveStrategy(message = "", error = false) {
+    activeStrategyText = "";
+    selectedOnlineStrategyId = "";
+    ui.activeStrategyOrigin.textContent = "当前策略：未选择";
+    ui.activeStrategyOrigin.removeAttribute("title");
+    clearStrategySummary();
+    ui.itemWarning.hidden = true;
+    ui.itemWarning.textContent = "";
+    for (const button of ui.onlineStrategies.querySelectorAll(".online-strategy")) {
+      button.classList.remove("selected");
+      button.setAttribute("aria-selected", "false");
+      button.querySelector(".online-strategy-details")?.remove();
+    }
+    if (message) setRunStatus(message, error);
     syncStrategyControls();
   }
 
@@ -546,10 +630,39 @@
     return empty;
   }
 
+  function renderOnlineStageFilters(stages) {
+    const fragment = document.createDocumentFragment();
+    if (!stages.length) {
+      const empty = document.createElement("span");
+      empty.className = "online-stage-empty";
+      empty.textContent = "没有可用关卡";
+      fragment.append(empty);
+    }
+    for (const stage of stages) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "online-stage-filter";
+      button.dataset.stageId = String(stage.id);
+      button.setAttribute("role", "tab");
+      const selected = String(stage.id) === selectedOnlineStageId;
+      button.classList.toggle("selected", selected);
+      button.setAttribute("aria-selected", String(selected));
+      button.textContent = `${stage.name} · ${stage.id} (${stage.count})`;
+      fragment.append(button);
+    }
+    ui.onlineStageFilters.replaceChildren(fragment);
+  }
+
   function renderOnlineStrategies() {
     if (!onlineStrategyIndex) return;
+    const stages = buildOnlineStageFilters(onlineStrategyIndex);
+    if (!stages.some((stage) => String(stage.id) === selectedOnlineStageId)) {
+      selectedOnlineStageId = stages.length ? String(stages[0].id) : "";
+    }
+    renderOnlineStageFilters(stages);
+    const visible = filterStrategiesByStage(onlineStrategyIndex, selectedOnlineStageId);
     const fragment = document.createDocumentFragment();
-    for (const entry of onlineStrategyIndex.strategies) {
+    for (const entry of visible) {
       const button = document.createElement("button");
       button.type = "button";
       button.className = "online-strategy";
@@ -572,28 +685,46 @@
         titleRow.append(tag);
       }
 
-      const stage = document.createElement("span");
-      stage.className = "online-strategy-meta";
-      stage.textContent = `关卡 ${entry.stage.name}（id ${entry.stage.id}）`;
-
-      const team = document.createElement("span");
-      team.className = "online-strategy-meta";
-      team.textContent = entry.team.map((cat) => `${cat.name} Lv.${cat.level}`).join("、");
-
-      const description = document.createElement("span");
-      description.className = "online-strategy-description";
-      description.textContent = entry.description;
-
-      button.append(titleRow, stage, team, description);
+      button.append(titleRow);
+      if (selected) {
+        const details = document.createElement("span");
+        details.className = "online-strategy-details";
+        const stage = document.createElement("span");
+        stage.className = "online-strategy-meta";
+        stage.textContent = `关卡 ${entry.stage.name}（id ${entry.stage.id}）`;
+        const team = document.createElement("span");
+        team.className = "online-strategy-meta";
+        team.textContent = entry.team.map((cat) => `${cat.name} Lv.${cat.level}`).join("、");
+        const description = document.createElement("span");
+        description.className = "online-strategy-description";
+        description.textContent = entry.description;
+        details.append(stage, team, description);
+        button.append(details);
+      }
       fragment.append(button);
     }
-    if (!onlineStrategyIndex.strategies.length) {
-      fragment.append(onlineEmpty("索引中没有符合当前阵容等级的策略。"));
+    if (!visible.length) {
+      fragment.append(onlineEmpty(onlineStrategyIndex.strategies.length
+        ? "当前关卡没有有效策略。"
+        : "索引中没有符合当前阵容等级的策略。"));
     }
     ui.onlineStrategies.replaceChildren(fragment);
     const capturedAt = onlineStrategyIndex.roster.capturedAt.replace("T", " ").slice(0, 16);
-    setOnlineStatus(`已加载 ${onlineStrategyIndex.strategies.length} 个有效策略 · 等级基准 ${capturedAt}`);
+    setOnlineStatus(`${stages.length} 个关卡 · 当前显示 ${visible.length}/${onlineStrategyIndex.strategies.length} 个有效策略 · 等级基准 ${capturedAt}`);
     syncStrategyControls();
+  }
+
+  function selectOnlineStage(stageId) {
+    if (!onlineStrategyIndex) return;
+    const stages = buildOnlineStageFilters(onlineStrategyIndex);
+    if (!stages.some((stage) => String(stage.id) === String(stageId))) return;
+    if (String(stageId) === selectedOnlineStageId) return;
+    const activeEntry = onlineStrategyIndex.strategies.find((entry) => entry.id === selectedOnlineStrategyId);
+    selectedOnlineStageId = String(stageId);
+    if (activeEntry && Number(activeEntry.stage.id) !== Number(stageId)) {
+      clearActiveStrategy("已切换关卡筛选，请重新选择该关卡的策略。");
+    }
+    renderOnlineStrategies();
   }
 
   async function ensureOnlineStrategies(force = false) {
@@ -602,15 +733,7 @@
     force ||= expired;
     if (!force && onlineStrategyIndex) return onlineStrategyIndex;
     if (force && selectedOnlineStrategyId) {
-      selectedOnlineStrategyId = "";
-      activeStrategyText = "";
-      ui.strategyOrigin.textContent = "未选择策略";
-      ui.strategyOrigin.removeAttribute("title");
-      clearStrategySummary();
-      ui.itemWarning.hidden = true;
-      ui.itemWarning.textContent = "";
-      setRunStatus("正在刷新有效策略列表，请重新选择在线策略。");
-      syncStrategyControls();
+      clearActiveStrategy("正在刷新有效策略列表，请重新选择在线策略。");
     }
     if (!onlineStrategyIndex) {
       ui.onlineStrategies.replaceChildren(onlineEmpty("正在读取在线策略索引…"));
@@ -622,14 +745,7 @@
       onlineStrategyIndex = index;
       onlineStrategyIndexLoadedAt = Date.now();
       if (selectedOnlineStrategyId && !index.strategies.some((entry) => entry.id === selectedOnlineStrategyId)) {
-        selectedOnlineStrategyId = "";
-        activeStrategyText = "";
-        ui.strategyOrigin.textContent = "未选择策略";
-        ui.strategyOrigin.removeAttribute("title");
-        clearStrategySummary();
-        ui.itemWarning.hidden = true;
-        ui.itemWarning.textContent = "";
-        setRunStatus("原在线策略已从有效索引移除，请重新选择策略。", true);
+        clearActiveStrategy("原在线策略已从有效索引移除，请重新选择策略。", true);
       }
       renderOnlineStrategies();
       return index;
@@ -1210,6 +1326,34 @@
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KiB`;
     return `${(bytes / 1024 / 1024).toFixed(2)} MiB`;
   }
+
+  // testable:buildOnlineStageFilters
+  function buildOnlineStageFilters(index) {
+    const stages = [];
+    const byId = new Map();
+    for (const strategy of Array.isArray(index?.strategies) ? index.strategies : []) {
+      const id = Number(strategy?.stage?.id);
+      const name = String(strategy?.stage?.name ?? "").trim();
+      if (!Number.isInteger(id) || id < 1 || !name) continue;
+      let stage = byId.get(id);
+      if (!stage) {
+        stage = { id, name, count: 0 };
+        byId.set(id, stage);
+        stages.push(stage);
+      }
+      stage.count++;
+    }
+    return stages;
+  }
+  // end testable:buildOnlineStageFilters
+
+  // testable:filterStrategiesByStage
+  function filterStrategiesByStage(index, stageId) {
+    const expected = String(stageId);
+    return (Array.isArray(index?.strategies) ? index.strategies : [])
+      .filter((strategy) => String(strategy?.stage?.id) === expected);
+  }
+  // end testable:filterStrategiesByStage
 
   // testable:parseStrategyIndex
   function parseStrategyIndex(rawText, rawRoot = "https://github.com/ZeroJehovah/ilovecat-battle-sim-docs/raw/main/strategies/") {
@@ -2072,7 +2216,6 @@
       stopped: false,
     };
     ui.run.disabled = true;
-    ui.validate.disabled = true;
     executor.timer = setTimeout(executeTick, 0);
     const speedNote = ui.autoSpeed.checked ? "\n自动倍速：已把战斗保存倍速设为 1×。" : "";
     setRunStatus(`${combined.join("\n")}${speedNote}\n\n正在点击“开始战斗”…`);
@@ -2106,7 +2249,6 @@
       stopped: false,
     };
     ui.run.disabled = true;
-    ui.validate.disabled = true;
     executor.timer = setTimeout(executeTick, 0);
     setRunStatus("运行中：等待战斗快照…");
   }
@@ -2118,7 +2260,6 @@
     if (executor) executor.stopped = true;
     executor = null;
     ui.run.disabled = false;
-    ui.validate.disabled = false;
     syncStrategyControls();
     if (raised) {
       setStoredBattleSpeed(1);

@@ -26,7 +26,7 @@ test("the userscript is syntactically valid and exposes both workflows", () => {
   assert.match(source, /@grant\s+GM_xmlhttpRequest/);
   assert.match(source, /@connect\s+github\.com/);
   assert.match(source, /@connect\s+raw\.githubusercontent\.com/);
-  assert.match(source, /USERSCRIPT_VERSION = "0\.4\.0"/);
+  assert.match(source, /USERSCRIPT_VERSION = "0\.5\.0"/);
   assert.match(source, /<div class="title">喵喵的逆袭工具 <span class="version">v\$\{USERSCRIPT_VERSION\}<\/span><\/div>/);
   assert.match(source, /ilovecat-game-export/);
   assert.match(source, /ilovecat-battle-strategy/);
@@ -37,13 +37,25 @@ test("the userscript is syntactically valid and exposes both workflows", () => {
   assert.match(source, /选择本地 JSON/);
   assert.match(source, /strategyFile/);
   assert.match(source, /online-strategies/);
+  assert.ok(source.includes('<button data-tab="online">在线策略</button>'));
+  assert.ok(source.includes('<button data-tab="local">本地策略</button>'));
+  assert.ok(!source.includes('data-tab="execute"'));
+  assert.match(source, /online-stage-filters/);
+  assert.match(source, /online-stage-filter.selected/);
+  assert.match(source, /online-strategy-details/);
+  assert.match(source, /const visible = filterStrategiesByStage/);
+  assert.ok(source.includes("if (selected) {"));
+  assert.ok(!source.includes('class="validate"'));
+  assert.ok(!source.includes("ui.validate"));
+  assert.ok(!source.includes("校验</button>"));
+  assert.ok(source.split("await validateFromUi()").length - 1 >= 2);
   assert.match(source, /ilovecat-battle-sim-docs\/raw\/main\/strategies\/index\.json/);
   assert.match(source, /GM_xmlhttpRequest/);
-  const executeViewStart = source.indexOf('<div class="view" data-view="execute"');
-  const executeViewEnd = source.indexOf("</section>", executeViewStart);
-  assert.notEqual(executeViewStart, -1);
-  assert.notEqual(executeViewEnd, -1);
-  assert.doesNotMatch(source.slice(executeViewStart, executeViewEnd), /<textarea/);
+  const strategyViewStart = source.indexOf('<div class="view" data-view="online"');
+  const strategyViewEnd = source.indexOf("</section>", strategyViewStart);
+  assert.notEqual(strategyViewStart, -1);
+  assert.notEqual(strategyViewEnd, -1);
+  assert.doesNotMatch(source.slice(strategyViewStart, strategyViewEnd), /<textarea/);
   assert.doesNotMatch(source, /粘贴 ilovecat-battle-strategy JSON/);
   assert.doesNotMatch(source, /ui\.strategy\b/);
   assert.match(source, /strictTimeline/);
@@ -204,6 +216,25 @@ test("the online strategy index is strict and is cross-checked against each sele
   const stale = JSON.parse(rawIndex);
   stale.strategies[0].team[0].level = 47;
   assert.throws(() => parseStrategyIndex(JSON.stringify(stale), rawRoot), /等级与当前阵容基准不一致/);
+});
+
+test("online strategy filters expose one stage at a time in index order", () => {
+  const buildOnlineStageFilters = markedFunction("buildOnlineStageFilters");
+  const filterStrategiesByStage = markedFunction("filterStrategiesByStage");
+  const index = {
+    strategies: [
+      { id: "boss-a", stage: { id: 9001, name: "世界王" } },
+      { id: "boss-b", stage: { id: 9001, name: "世界王" } },
+      { id: "endless", stage: { id: 9101, name: "无尽" } },
+    ],
+  };
+  assert.deepEqual(buildOnlineStageFilters(index), [
+    { id: 9001, name: "世界王", count: 2 },
+    { id: 9101, name: "无尽", count: 1 },
+  ]);
+  assert.deepEqual(filterStrategiesByStage(index, "9001").map((entry) => entry.id), ["boss-a", "boss-b"]);
+  assert.deepEqual(filterStrategiesByStage(index, 9101).map((entry) => entry.id), ["endless"]);
+  assert.deepEqual(filterStrategiesByStage(index, 1), []);
 });
 
 test("fixed campaign stages accept a compact comma-separated id list", () => {
