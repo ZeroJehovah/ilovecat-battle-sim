@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         喵喵的逆袭 · 数据导出与策略执行
 // @namespace    https://github.com/ZeroJehovah/ilovecat-battle-sim
-// @version      0.3.2
+// @version      0.3.3
 // @description  按范围只读导出战斗数据与 JS，并按 JSON 策略操作战斗页面；支持空闲自动倍速
 // @match        https://api.ilovecat520.me/*
 // @updateURL    https://raw.githubusercontent.com/ZeroJehovah/ilovecat-battle-sim/main/tools/ilovecat-workbench.user.js
@@ -15,7 +15,7 @@
 
   const STRATEGY_FORMAT = "ilovecat-battle-strategy";
   const EXPORT_FORMAT = "ilovecat-game-export";
-  const USERSCRIPT_VERSION = "0.3.2";
+  const USERSCRIPT_VERSION = "0.3.3";
   const STORAGE_KEY = "ilovecat-workbench-strategy";
   const ACTION_GAP_MS = 250;
   const LOOP_MS = 100;
@@ -167,10 +167,8 @@
           <div class="scope-card">
             <div class="scope-title">导出范围</div>
             <label class="check"><input class="include-catalog" type="checkbox" checked> 图鉴基础数据（猫、鼠、道具、规则）</label>
-            <div class="scope-heading"><span>队伍信息（账号相关）</span></div>
-            <label class="check"><input class="include-team" type="checkbox" checked> 当前队伍、槽位和等级</label>
-            <label class="check"><input class="include-owned" type="checkbox"> 已拥有猫咪的等级列表</label>
-            <label class="check"><input class="include-inventory" type="checkbox" checked> 当前战斗道具数量</label>
+            <div class="scope-heading"><span>可选账号信息（不会进入 snapshot）</span></div>
+            <label class="check"><input class="include-owned" type="checkbox"> 已拥有猫咪的等级列表（用于分析可用阵容）</label>
             <div class="scope-heading">
               <span>页面关卡（逐关勾选）</span>
               <span class="stage-tools">
@@ -182,17 +180,18 @@
             </div>
             <div class="stage-list" role="group" aria-label="导出关卡"><div class="stage-empty">正在读取页面关卡…</div></div>
             <p class="muted stage-summary">尚未读取关卡。</p>
-            <div class="scope-heading">战斗 JS（可选）</div>
+            <div class="scope-heading">战斗逻辑 JS 源码（可选）</div>
             <label class="check radio"><input class="js-scope" type="radio" name="export-js-scope" value="none" checked> 不导出 JS（只取数据时推荐）</label>
-            <label class="check radio"><input class="js-scope" type="radio" name="export-js-scope" value="battle"> 仅当前战斗 JS（正文、大小和 SHA-256）</label>
-            <label class="check radio"><input class="js-scope" type="radio" name="export-js-scope" value="all"> 当前战斗 JS + 全部同源已加载 JS 正文</label>
+            <label class="check radio"><input class="js-scope" type="radio" name="export-js-scope" value="battle"> 仅战斗逻辑 JS（正文、大小和 SHA-256）</label>
+            <label class="check radio"><input class="js-scope" type="radio" name="export-js-scope" value="all"> 战斗逻辑 JS + 全部同源已加载 JS 正文</label>
+            <p class="muted scope-note">这不是战斗记录，而是游戏当前版本的战斗代码 bundle。导出时不需要正在战斗，但当前标签页必须已经加载过战斗界面；首次打开或刷新页面后通常要先进入一次战斗，让浏览器载入该 JS。</p>
             <p class="muted scope-note">“全部同源已加载 JS”会写入当前页面加载过的每个同源 .js 完整正文，通常有数 MiB；只做数据或关卡分析时保持“不导出”即可。</p>
           </div>
           <div class="actions">
             <button class="primary copy-export">复制所选 JSON</button>
             <button class="download-export">下载所选 JSON</button>
           </div>
-          <p class="muted scope-note">所选 JSON 的 snapshot 字段就是模拟器 data/snapshot.json 所需结构；需要图鉴和至少 1 个关卡才能直接运行，队伍和 JS 不会进入该字段。</p>
+          <p class="muted scope-note">所选 JSON 的 snapshot 字段就是模拟器 data/snapshot.json 所需结构；需要图鉴和至少 1 个关卡才能直接运行，账号信息和 JS 不会进入该字段。</p>
           <div class="copy-fallback" hidden>
             <p class="muted">自动复制失败。文本框中的内容已选中，请按 Ctrl+C。</p>
             <textarea readonly></textarea>
@@ -226,9 +225,7 @@
       tabs: [...root.querySelectorAll("[data-tab]")],
       views: [...root.querySelectorAll("[data-view]")],
       includeCatalog: root.querySelector(".include-catalog"),
-      includeTeam: root.querySelector(".include-team"),
       includeOwned: root.querySelector(".include-owned"),
-      includeInventory: root.querySelector(".include-inventory"),
       jsScopes: [...root.querySelectorAll(".js-scope")],
       stageList: root.querySelector(".stage-list"),
       stageSummary: root.querySelector(".stage-summary"),
@@ -292,7 +289,7 @@
       download(`ilovecat-export-${stamp()}.json`, text);
       setExportStatus(`已下载所选 JSON（${formatBytes(text.length)}）。`);
     }));
-    for (const control of [ui.includeCatalog, ui.includeTeam, ui.includeOwned, ui.includeInventory, ...ui.jsScopes]) {
+    for (const control of [ui.includeCatalog, ui.includeOwned, ...ui.jsScopes]) {
       control.addEventListener("change", updateExportControls);
     }
     ui.stageAll.addEventListener("click", () => setStageSelection("all"));
@@ -536,9 +533,7 @@
   function readExportSelection() {
     return {
       includeCatalog: ui.includeCatalog.checked,
-      includeTeam: ui.includeTeam.checked,
       includeOwned: ui.includeOwned.checked,
-      includeInventory: ui.includeInventory.checked,
       stageKeys: [...ui.stageList.querySelectorAll('input[type="checkbox"]:checked')]
         .map((input) => input.value),
       jsScope: ui.jsScopes.find((input) => input.checked)?.value ?? "none",
@@ -548,9 +543,7 @@
   function updateExportControls() {
     const stageInputs = [...ui.stageList.querySelectorAll('input[type="checkbox"]')];
     const selectedCount = stageInputs.filter((input) => input.checked).length;
-    const rosterCount = [ui.includeTeam, ui.includeOwned, ui.includeInventory]
-      .filter((input) => input.checked).length;
-    const hasData = ui.includeCatalog.checked || rosterCount > 0 || selectedCount > 0
+    const hasData = ui.includeCatalog.checked || ui.includeOwned.checked || selectedCount > 0
       || ui.jsScopes.some((input) => input.checked && input.value !== "none");
     if (stageInputs.length) {
       const snapshotHint = ui.includeCatalog.checked
@@ -566,7 +559,7 @@
   }
 
   async function captureExport(selection) {
-    const needsState = selection.includeTeam || selection.includeOwned || selection.includeInventory;
+    const needsState = selection.includeOwned;
     const hasData = selection.includeCatalog || needsState || selection.stageKeys.length
       || selection.jsScope !== "none";
     if (!hasData) throw new Error("至少选择一项导出内容。");
@@ -600,7 +593,7 @@
         source: pagePath,
       })
       : null;
-    const roster = needsState ? buildRoster(catalog, state, selection) : null;
+    const roster = needsState ? buildRoster(catalog, state) : null;
     let client = null;
     if (selection.jsScope !== "none") {
       setExportStatus("正在识别并读取所选战斗 JS…");
@@ -618,9 +611,7 @@
       capturedAt,
       selection: {
         catalog: selection.includeCatalog,
-        team: selection.includeTeam,
         ownedUnits: selection.includeOwned,
-        inventory: selection.includeInventory,
         stages: stageSelection,
         scripts: selection.jsScope,
       },
@@ -638,52 +629,28 @@
     }
     summary.push(`关卡：已选 ${selectedStages.length} 个，每关含完整波次`);
     if (roster) {
-      const rosterParts = [];
-      if (roster.team) rosterParts.push(`${roster.team.length} 槽队伍`);
-      if (roster.ownedUnits) rosterParts.push(`已有 ${roster.ownedUnits.length} 只`);
-      if (roster.inventory) rosterParts.push("道具数量");
-      summary.push(`队伍信息：${rosterParts.join(" / ")}`);
+      summary.push(`额外信息：已拥有 ${roster.ownedUnits.length} 只猫咪`);
     }
     if (client) {
       const bundleSize = client.battleBundles.reduce((total, item) => total + item.bytes, 0);
-      summary.push(`战斗 JS：${client.battleBundles.length} 个 bundle，${formatBytes(bundleSize)}${client.allScripts ? "；另含全部同源脚本正文" : ""}`);
+      summary.push(`战斗逻辑 JS：${client.battleBundles.length} 个 bundle，${formatBytes(bundleSize)}${client.allScripts ? "；另含全部同源脚本正文" : ""}`);
     }
     setExportStatus(summary.join("\n"));
     return { full, snapshot };
   }
 
   // testable:buildRoster
-  function buildRoster(catalog, state, selection) {
+  function buildRoster(catalog, state) {
     const cats = new Map((catalog.cats ?? []).map((cat) => [cat.id, cat]));
-    const units = new Map((state.units ?? []).filter((unit) => unit.owned).map((unit) => [unit.cat_id, unit]));
-    const roster = {};
-    if (selection.includeTeam) {
-      roster.team = (state.team ?? []).map((id, slot) => {
-        const cat = cats.get(id);
-        return {
-          slot,
-          id,
-          name: cat?.name ?? id,
-          level: Number(units.get(id)?.level ?? 1),
-        };
-      });
-      roster.scenarioTeam = roster.team.map(({ id, level }) => ({ id, level }));
-    }
-    if (selection.includeOwned) {
-      roster.ownedUnits = (state.units ?? [])
+    return {
+      ownedUnits: (state.units ?? [])
         .filter((unit) => unit.owned)
         .map((unit) => ({
           id: unit.cat_id,
           name: cats.get(unit.cat_id)?.name ?? unit.cat_id,
           level: Number(unit.level),
-        }));
-    }
-    if (selection.includeInventory) {
-      roster.inventory = Object.fromEntries(
-        (catalog.items ?? []).map((item) => [item.id, Number(state.items?.[item.id] ?? 0)]),
-      );
-    }
-    return roster;
+        })),
+    };
   }
   // end testable:buildRoster
 
@@ -721,7 +688,7 @@
       }
     }
     if (hits.length === 0) {
-      throw new Error("没有在已加载脚本中找到战斗块。请先进入一次战斗页面再导出。");
+      throw new Error("没有在已加载脚本中找到战斗逻辑 JS。请先在本标签页进入一次战斗界面（无需正在战斗），再导出。");
     }
     const battleBundles = [];
     for (const hit of hits) {

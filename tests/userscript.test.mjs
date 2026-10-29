@@ -23,7 +23,7 @@ test("the userscript is syntactically valid and exposes both workflows", () => {
   assert.doesNotThrow(() => new Function(source));
   assert.match(source, /@match\s+https:\/\/api\.ilovecat520\.me\/\*/);
   assert.match(source, /@updateURL\s+https:\/\/raw\.githubusercontent\.com\/ZeroJehovah\/ilovecat-battle-sim\/main\/tools\/ilovecat-workbench\.user\.js/);
-  assert.match(source, /USERSCRIPT_VERSION = "0\.3\.2"/);
+  assert.match(source, /USERSCRIPT_VERSION = "0\.3\.3"/);
   assert.match(source, /ilovecat-game-export/);
   assert.match(source, /ilovecat-battle-strategy/);
   assert.match(source, /battleBundles/);
@@ -67,7 +67,8 @@ test("the userscript is syntactically valid and exposes both workflows", () => {
   assert.match(source, /policy\.actionGap/);
   assert.match(source, /节奏会不一致/);
   assert.match(source, /include-catalog/);
-  assert.match(source, /include-team/);
+  assert.match(source, /include-owned/);
+  assert.doesNotMatch(source, /include-team|include-inventory/);
   assert.match(source, /stage-list/);
   assert.match(source, /仅当前无尽/);
   assert.match(source, /仅限时活动/);
@@ -186,30 +187,17 @@ test("selected export creates a simulator snapshot from only chosen stages", () 
   assert.equal(stagesOnly.stage.id, 1);
 });
 
-test("team, owned cats and inventory are omitted unless selected", () => {
+test("only owned cat levels can be added to the export", () => {
   const buildRoster = markedFunction("buildRoster");
   const catalog = {
     cats: [{ id: "c1", name: "cat" }],
-    items: [{ id: "rally" }],
   };
   const state = {
     team: ["c1"],
     units: [{ cat_id: "c1", owned: true, level: 12 }],
-    items: { rally: 3 },
   };
-  assert.deepEqual(buildRoster(catalog, state, {
-    includeTeam: false,
-    includeOwned: false,
-    includeInventory: false,
-  }), {});
-  assert.deepEqual(buildRoster(catalog, state, {
-    includeTeam: true,
-    includeOwned: false,
-    includeInventory: true,
-  }), {
-    team: [{ slot: 0, id: "c1", name: "cat", level: 12 }],
-    scenarioTeam: [{ id: "c1", level: 12 }],
-    inventory: { rally: 3 },
+  assert.deepEqual(buildRoster(catalog, state), {
+    ownedUnits: [{ id: "c1", name: "cat", level: 12 }],
   });
 });
 
