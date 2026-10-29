@@ -23,7 +23,7 @@ test("the userscript is syntactically valid and exposes both workflows", () => {
   assert.doesNotThrow(() => new Function(source));
   assert.match(source, /@match\s+https:\/\/api\.ilovecat520\.me\/\*/);
   assert.match(source, /@updateURL\s+https:\/\/raw\.githubusercontent\.com\/ZeroJehovah\/ilovecat-battle-sim\/main\/tools\/ilovecat-workbench\.user\.js/);
-  assert.match(source, /USERSCRIPT_VERSION = "0\.3\.4"/);
+  assert.match(source, /USERSCRIPT_VERSION = "0\.3\.5"/);
   assert.match(source, /<div class="title">喵喵的逆袭工具 <span class="version">v\$\{USERSCRIPT_VERSION\}<\/span><\/div>/);
   assert.match(source, /ilovecat-game-export/);
   assert.match(source, /ilovecat-battle-strategy/);
@@ -48,7 +48,9 @@ test("the userscript is syntactically valid and exposes both workflows", () => {
   assert.match(source, /selectPreparationItems/);
   assert.match(source, /prep = await selectPreparationItems\(strategy, prep\)/);
   assert.match(source, /updateItemWarning/);
-  assert.match(source, /strategyRosterLines/);
+  assert.match(source, /buildStrategySummary/);
+  assert.match(source, /适用关卡：/);
+  assert.doesNotMatch(source, /出战顺序/);
   assert.match(source, /matchesStageTitle/);
   assert.match(source, /readStageFromFiber/);
   assert.match(source, /validatePreparationStage/);
@@ -76,10 +78,23 @@ test("the userscript is syntactically valid and exposes both workflows", () => {
   assert.match(source, /当前无尽/);
   assert.match(source, /每日任务/);
   assert.match(source, /限时活动/);
+  assert.match(source, /daily-master/);
+  assert.match(source, /daily-difficulty-input/);
+  assert.match(source, /fixed-stage-enable/);
   assert.match(source, /fixed-stage-input/);
   assert.match(source, /placeholder="关卡 id，例如 1,2,3"/);
+  assert.match(source, /js-enable/);
   assert.match(source, /JS源码：/);
-  assert.match(source, /JS源码：<\/span>[\s\S]*?value="none" checked> 无[\s\S]*?value="battle"> 战斗逻辑[\s\S]*?value="all"> 全部/);
+  assert.match(source, /JS源码：<\/label>[\s\S]*?value="battle" disabled> 战斗逻辑[\s\S]*?value="all" disabled> 全部/);
+  assert.doesNotMatch(source, /value="none"/);
+  assert.doesNotMatch(source, /include-catalog" type="checkbox" checked/);
+  assert.match(source, /ui\.fixedStages\.disabled = !ui\.fixedStageEnable\.checked/);
+  assert.match(source, /input\.disabled = !dailyEnabled/);
+  assert.match(source, /input\.checked = selectedBefore\.has\(entry\.key\)/);
+  assert.match(source, /stageChoices\.querySelectorAll\("input\[data-stage-key\]:checked"\)/);
+  assert.doesNotMatch(source, /!hadOptions|previouslyAll/);
+  assert.doesNotMatch(source, /privacy:\s*\{/);
+  assert.match(source, /\[data-view="execute"\] > textarea \{ height: 128px; min-height: 128px; resize: none; \}/);
   assert.doesNotMatch(source, /stage-all|stage-none|stage-endless|stage-raid/);
   assert.doesNotMatch(source, /v\$\{USERSCRIPT_VERSION\} · 只读导出；执行器只操作页面按钮和游戏键盘事件/);
   assert.doesNotMatch(source, /复制和下载共用下面的范围/);
@@ -113,6 +128,27 @@ test("fixed campaign stages accept a compact comma-separated id list", () => {
   assert.deepEqual(parseFixedStageIds(" 3，1 2, 3 "), [3, 1, 2]);
   assert.throws(() => parseFixedStageIds("1,a"), /固定关卡格式有误/);
   assert.throws(() => parseFixedStageIds("0"), /固定关卡 id 无效/);
+});
+
+test("strategy summary uses cat names and never prints deploy sequence", () => {
+  const buildStrategySummary = markedFunction("buildStrategySummary");
+  const summary = buildStrategySummary({
+    name: "daily-heavy",
+    team: [
+      { id: "c1", level: 12 },
+      { id: "c2", level: 7 },
+    ],
+    policy: { deploySequence: ["c1", "c1", "c2"] },
+  }, "万圣节之夜・地狱", new Map([
+    ["c1", "狮子王喵"],
+    ["c2", "星空狙击喵"],
+  ]));
+  assert.equal(summary, [
+    "策略名称：daily-heavy",
+    "适用关卡：万圣节之夜・地狱",
+    "策略队伍：狮子王喵 Lv.12；星空狙击喵 Lv.7",
+  ].join("\n"));
+  assert.doesNotMatch(summary, /c1|c2|出战顺序/);
 });
 
 test("the export scope lists campaign, endless, daily and active raid stages", () => {
@@ -305,6 +341,6 @@ test("only owned cat levels can be added to the export", () => {
 test("the userscript does not submit data or export unrelated account state", () => {
   assert.doesNotMatch(source, /method:\s*["']POST["']/i);
   assert.doesNotMatch(source, /fetch\([^\n]+,\s*\{[^}]*method:/s);
-  assert.match(source, /"uid", "cookies", "authorization", "cans"/);
+  assert.doesNotMatch(source, /privacy:\s*\{/);
   assert.doesNotMatch(source, /state\.cans/);
 });

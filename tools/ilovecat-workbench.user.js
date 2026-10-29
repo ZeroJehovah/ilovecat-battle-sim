@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         喵喵的逆袭 · 数据导出与策略执行
 // @namespace    https://github.com/ZeroJehovah/ilovecat-battle-sim
-// @version      0.3.4
+// @version      0.3.5
 // @description  按范围只读导出战斗数据与 JS，并按 JSON 策略操作战斗页面；支持空闲自动倍速
 // @match        https://api.ilovecat520.me/*
 // @updateURL    https://raw.githubusercontent.com/ZeroJehovah/ilovecat-battle-sim/main/tools/ilovecat-workbench.user.js
@@ -15,7 +15,7 @@
 
   const STRATEGY_FORMAT = "ilovecat-battle-strategy";
   const EXPORT_FORMAT = "ilovecat-game-export";
-  const USERSCRIPT_VERSION = "0.3.4";
+  const USERSCRIPT_VERSION = "0.3.5";
   const STORAGE_KEY = "ilovecat-workbench-strategy";
   const ACTION_GAP_MS = 250;
   const LOOP_MS = 100;
@@ -39,7 +39,6 @@
   let speedRestoreToken = 0;
   let stageOptions = null;
   let stageOptionsPromise = null;
-  let previousStageKeys = [];
 
   window.__ilovecatWorkbenchV1?.destroy?.();
 
@@ -109,6 +108,7 @@
           border: 1px solid #4e5866; background: #0e1218; color: #e8eef6;
           padding: 10px; font: 12px/1.5 ui-monospace, SFMono-Regular, Consolas, monospace;
         }
+        [data-view="execute"] > textarea { height: 128px; min-height: 128px; resize: none; }
         input[type="file"][hidden] { display: none !important; }
         .warning { color: #f4ca7c; }
         .scope-card {
@@ -118,9 +118,15 @@
         .scope-card label.check { margin: 6px 0; }
         .scope-card label.radio { line-height: 1.4; }
         .stage-choices { margin: 5px 0 2px; }
-        .stage-option {
+        .stage-option, .daily-stage-row {
           display: flex; align-items: center; gap: 7px; padding: 4px 0;
-          border-radius: 6px; font-size: 12px; line-height: 1.35; cursor: pointer;
+          border-radius: 6px; font-size: 12px; line-height: 1.35;
+        }
+        .stage-option { cursor: pointer; }
+        .daily-stage-row { gap: 10px; white-space: nowrap; }
+        .daily-difficulties { display: flex; align-items: center; gap: 8px; }
+        .daily-difficulty {
+          display: flex; align-items: center; gap: 4px; cursor: pointer;
         }
         .stage-kind { color: #f0b95c; font-weight: 700; }
         .fixed-stages {
@@ -174,17 +180,16 @@
         </div>
         <div class="view" data-view="export">
           <div class="scope-card">
-            <label class="check"><input class="include-catalog" type="checkbox" checked> 图鉴基础数据（猫、鼠、道具、规则）</label>
-            <label class="check"><input class="include-owned" type="checkbox"> 已拥有猫咪的等级列表（用于分析可用阵容）</label>
+            <label class="check"><input class="include-catalog" type="checkbox"> 图鉴基础数据（猫、鼠、道具、规则）</label>
+            <label class="check"><input class="include-owned" type="checkbox"> 已拥有猫咪的等级列表</label>
             <div class="stage-choices" role="group" aria-label="页面活动关卡"></div>
-            <label class="fixed-stages">固定关卡
-              <input class="fixed-stage-input" type="text" autocomplete="off" spellcheck="false" placeholder="关卡 id，例如 1,2,3" aria-label="固定关卡 id，例如 1,2,3">
+            <label class="fixed-stages"><input class="fixed-stage-enable" type="checkbox"> 固定关卡
+              <input class="fixed-stage-input" type="text" autocomplete="off" spellcheck="false" placeholder="关卡 id，例如 1,2,3" aria-label="固定关卡 id，例如 1,2,3" disabled>
             </label>
             <div class="js-scope-row" role="radiogroup" aria-label="JS 源码">
-              <span>JS源码：</span>
-              <label class="check radio"><input class="js-scope" type="radio" name="export-js-scope" value="none" checked> 无</label>
-              <label class="check radio"><input class="js-scope" type="radio" name="export-js-scope" value="battle"> 战斗逻辑</label>
-              <label class="check radio"><input class="js-scope" type="radio" name="export-js-scope" value="all"> 全部</label>
+              <label class="check"><input class="js-enable" type="checkbox"> JS源码：</label>
+              <label class="check radio"><input class="js-scope" type="radio" name="export-js-scope" value="battle" disabled> 战斗逻辑</label>
+              <label class="check radio"><input class="js-scope" type="radio" name="export-js-scope" value="all" disabled> 全部</label>
             </div>
           </div>
           <div class="actions">
@@ -223,7 +228,9 @@
       views: [...root.querySelectorAll("[data-view]")],
       includeCatalog: root.querySelector(".include-catalog"),
       includeOwned: root.querySelector(".include-owned"),
+      fixedStageEnable: root.querySelector(".fixed-stage-enable"),
       jsScopes: [...root.querySelectorAll(".js-scope")],
+      jsEnable: root.querySelector(".js-enable"),
       stageChoices: root.querySelector(".stage-choices"),
       fixedStages: root.querySelector(".fixed-stage-input"),
       copyExport: root.querySelector(".copy-export"),
@@ -281,11 +288,27 @@
       download(`ilovecat-export-${stamp()}.json`, text);
       setExportStatus(`已下载所选 JSON（${formatBytes(text.length)}）。`);
     }));
-    for (const control of [ui.includeCatalog, ui.includeOwned, ui.fixedStages, ...ui.jsScopes]) {
+    for (const control of [ui.includeCatalog, ui.includeOwned, ...ui.jsScopes]) {
       control.addEventListener("change", updateExportControls);
     }
+    ui.fixedStageEnable.addEventListener("change", () => {
+      syncExportControlState();
+      updateExportControls();
+    });
+    ui.jsEnable.addEventListener("change", () => {
+      syncExportControlState();
+      updateExportControls();
+    });
     ui.fixedStages.addEventListener("input", updateExportControls);
-    ui.stageChoices.addEventListener("change", updateExportControls);
+    ui.stageChoices.addEventListener("change", (event) => {
+      if (event.target.matches(".daily-master") && !event.target.checked) {
+        for (const input of ui.stageChoices.querySelectorAll(".daily-difficulty-input")) {
+          input.checked = false;
+        }
+      }
+      syncExportControlState();
+      updateExportControls();
+    });
     ui.validate.addEventListener("click", () => runBusy(() => validateFromUi()));
     ui.loadStrategy.addEventListener("click", () => ui.strategyFile.click());
     ui.strategyFile.addEventListener("change", () => runBusy(async () => {
@@ -305,6 +328,7 @@
       executor.autoSpeedStuckSince = 0;
       executor.autoSpeedMissingSince = 0;
     });
+    syncExportControlState();
     updateExportControls();
   }
 
@@ -476,33 +500,77 @@
   function renderStageOptions(entries) {
     const visibleEntries = entries.filter((entry) => entry.kind !== "campaign");
     const selectedBefore = new Set(
-      [...ui.stageChoices.querySelectorAll('input[type="checkbox"]')].map((input) => input.value),
+      [...ui.stageChoices.querySelectorAll("input[data-stage-key]:checked")].map((input) => input.value),
     );
-    const hadOptions = previousStageKeys.length > 0;
-    const previouslyAll = hadOptions && selectedBefore.size === previousStageKeys.length;
+    const dailyEnabled = Boolean(ui.stageChoices.querySelector(".daily-master")?.checked);
     const fragment = document.createDocumentFragment();
-    for (const entry of visibleEntries) {
+    const createStageInput = (entry) => {
       const input = document.createElement("input");
       input.type = "checkbox";
       input.value = entry.key;
-      input.checked = !hadOptions || selectedBefore.has(entry.key)
-        || (previouslyAll && !previousStageKeys.includes(entry.key));
+      input.dataset.stageKey = entry.key;
+      input.checked = selectedBefore.has(entry.key);
+      return input;
+    };
+    for (const entry of visibleEntries.filter((item) => item.kind !== "daily")) {
+      const input = createStageInput(entry);
       const label = document.createElement("label");
       label.className = "stage-option";
       const kind = document.createElement("span");
       kind.className = "stage-kind";
       kind.textContent = entry.kind === "endless"
         ? "当前无尽"
-        : entry.kind === "daily" ? "每日任务" : "限时活动";
+        : "限时活动";
       const detail = document.createElement("span");
       detail.textContent = entry.stage.name || "未命名关卡";
       label.title = `${kind.textContent}：${detail.textContent}`;
       label.append(input, kind, detail);
       fragment.append(label);
     }
+    const dailyEntries = visibleEntries.filter((entry) => entry.kind === "daily");
+    if (dailyEntries.length) {
+      const row = document.createElement("div");
+      row.className = "daily-stage-row";
+      const master = document.createElement("label");
+      master.className = "stage-option";
+      const masterInput = document.createElement("input");
+      masterInput.type = "checkbox";
+      masterInput.className = "daily-master";
+      masterInput.checked = dailyEnabled;
+      masterInput.setAttribute("aria-label", "每日任务");
+      const kind = document.createElement("span");
+      kind.className = "stage-kind";
+      kind.textContent = "每日任务";
+      master.append(masterInput, kind);
+
+      const difficulties = document.createElement("div");
+      difficulties.className = "daily-difficulties";
+      for (const entry of dailyEntries) {
+        const label = document.createElement("label");
+        label.className = "daily-difficulty";
+        const input = createStageInput(entry);
+        input.classList.add("daily-difficulty-input");
+        input.disabled = !dailyEnabled;
+        const name = document.createElement("span");
+        name.textContent = dailyDifficultyLabel(entry);
+        label.append(input, name);
+        difficulties.append(label);
+      }
+      row.append(master, difficulties);
+      fragment.append(row);
+    }
     ui.stageChoices.replaceChildren(fragment);
-    previousStageKeys = visibleEntries.map((entry) => entry.key);
+    syncExportControlState();
     updateExportControls();
+  }
+
+  function dailyDifficultyLabel(entry) {
+    return {
+      easy: "简单",
+      normal: "普通",
+      hard: "困难",
+      hell: "地狱",
+    }[entry.stage.daily] || entry.stage.name || "未知难度";
   }
 
   // testable:parseFixedStageIds
@@ -525,26 +593,53 @@
   // end testable:parseFixedStageIds
 
   function readExportSelection() {
-    const fixedStageKeys = parseFixedStageIds(ui.fixedStages.value)
+    const dailyEnabled = Boolean(ui.stageChoices.querySelector(".daily-master")?.checked);
+    const checkedStageKeys = [...ui.stageChoices.querySelectorAll("input[data-stage-key]:checked")]
+      .filter((input) => dailyEnabled || !input.classList.contains("daily-difficulty-input"))
+      .map((input) => input.value);
+    const fixedStageKeys = ui.fixedStageEnable.checked
+      ? parseFixedStageIds(ui.fixedStages.value)
+      : [];
+    const fixedKeys = fixedStageKeys
       .map((id) => "campaign:" + id);
     return {
       includeCatalog: ui.includeCatalog.checked,
       includeOwned: ui.includeOwned.checked,
       stageKeys: [...new Set([
-        ...[...ui.stageChoices.querySelectorAll('input[type="checkbox"]:checked')]
-          .map((input) => input.value),
-        ...fixedStageKeys,
+        ...checkedStageKeys,
+        ...fixedKeys,
       ])],
-      jsScope: ui.jsScopes.find((input) => input.checked)?.value ?? "none",
+      jsScope: ui.jsEnable.checked
+        ? ui.jsScopes.find((input) => input.checked)?.value ?? "battle"
+        : "none",
     };
   }
 
+  function syncExportControlState() {
+    ui.fixedStages.disabled = !ui.fixedStageEnable.checked;
+    const jsEnabled = ui.jsEnable.checked;
+    if (!jsEnabled) {
+      for (const input of ui.jsScopes) input.checked = false;
+    } else if (!ui.jsScopes.some((input) => input.checked)) {
+      const battle = ui.jsScopes.find((input) => input.value === "battle");
+      if (battle) battle.checked = true;
+    }
+    for (const input of ui.jsScopes) input.disabled = !jsEnabled;
+    const dailyEnabled = Boolean(ui.stageChoices.querySelector(".daily-master")?.checked);
+    for (const input of ui.stageChoices.querySelectorAll(".daily-difficulty-input")) {
+      input.disabled = !dailyEnabled;
+    }
+  }
+
   function updateExportControls() {
-    const stageInputs = [...ui.stageChoices.querySelectorAll('input[type="checkbox"]')];
-    const selectedCount = stageInputs.filter((input) => input.checked).length;
+    const dailyEnabled = Boolean(ui.stageChoices.querySelector(".daily-master")?.checked);
+    const stageInputs = [...ui.stageChoices.querySelectorAll("input[data-stage-key]")];
+    const selectedCount = stageInputs.filter((input) => {
+      return input.checked && (dailyEnabled || !input.classList.contains("daily-difficulty-input"));
+    }).length;
     const hasData = ui.includeCatalog.checked || ui.includeOwned.checked || selectedCount > 0
-      || ui.fixedStages.value.trim() !== ""
-      || ui.jsScopes.some((input) => input.checked && input.value !== "none");
+      || (ui.fixedStageEnable.checked && ui.fixedStages.value.trim() !== "")
+      || ui.jsEnable.checked;
     if (busy) return;
     ui.copyExport.disabled = !hasData;
     ui.downloadExport.disabled = !hasData;
@@ -617,13 +712,6 @@
       ...(snapshot ? { snapshot } : {}),
       ...(roster ? { roster } : {}),
       ...(client ? { client } : {}),
-      privacy: {
-        excluded: [
-          "uid", "cookies", "authorization", "cans", "clears", "stars", "pity",
-          "draws", "attempts", "dailyChosen", "dailyWon",
-        ],
-        note: "只包含本次勾选的数据；排除登录凭据、余额、通关/星级、每日任务选择/领奖状态、抽卡和无尽次数。",
-      },
     };
     const summary = [];
     if (selection.includeCatalog) {
@@ -918,14 +1006,24 @@
     const runtime = findBattleRuntime();
     const active = isActiveRuntime(runtime) ? runtime : { context: null, snapshot: null };
     const prep = active.context ? null : findPreparationRuntime(strategy);
-    const names = namesForStrategy(strategy, active, prep);
-    const messages = validateStrategy(strategy, active, names);
+    const display = await resolveStrategyDisplay(strategy, active, prep);
+    const messages = validateStrategy(strategy, active, display.names);
     if (!active.context) {
       if (prep) messages.push(...validatePreparation(strategy, prep));
       else messages.push("提示：没有找到可用的“出战”准备界面（按策略关卡 id/名称匹配）。");
     }
     updateItemWarning(strategy, prep, Boolean(active.context));
-    setRunStatus(messages.join("\n"), messages.some((line) => line.startsWith("错误")));
+    const hasError = messages.some((line) => line.startsWith("错误"));
+    if (hasError) {
+      setRunStatus(messages.join("\n"), true);
+    } else {
+      const notes = messages.filter((line) => /^(?:警告|提示)：/.test(line));
+      setRunStatus([
+        buildStrategySummary(strategy, display.stageName, display.names),
+        ...notes,
+        "校验通过。",
+      ].join("\n"));
+    }
     return strategy;
   }
 
@@ -941,39 +1039,50 @@
     return names;
   }
 
-  function strategyRosterLines(strategy, names = new Map()) {
-    const team = Array.isArray(strategy.team) ? strategy.team : [];
-    if (!team.length) return [];
-    const roster = team.map((entry) => {
-      const name = names.get(entry.id) || entry.id;
-      const target = strategy.policy?.targetCounts?.[entry.id];
-      return `${entry.id} ${name} Lv.${entry.level}${target != null ? ` ×${target}` : ""}`;
-    });
-    const sequence = compressSequence(strategy.policy?.deploySequence ?? [], names);
-    return [
-      `策略队伍：${roster.join("；")}`,
-      sequence ? `出战顺序：${sequence}` : null,
-    ].filter(Boolean);
+  async function resolveStrategyDisplay(strategy, active, prep) {
+    const names = namesForStrategy(strategy, active, prep);
+    let catalog = stageOptions?.catalog;
+    let entries = stageOptions?.entries;
+    if (!catalog || !entries) {
+      try {
+        const sources = await loadStageSources();
+        catalog = sources.catalog;
+        entries = buildStageEntries(catalog, sources.endless, sources.raid, sources.state?.daily);
+      } catch {
+        entries = [];
+      }
+    }
+    for (const cat of catalog?.cats ?? []) names.set(String(cat.id), String(cat.name ?? cat.id));
+    const matchingStage = strategy.stageId == null
+      ? null
+      : entries?.find((entry) => Number(entry.stage.id) === Number(strategy.stageId));
+    const stageName = String(strategy.stage?.name ?? "").trim()
+      || matchingStage?.stage.name
+      || prep?.stage?.name
+      || active?.context?.stageName
+      || (strategy.stageId == null ? "未指定" : "未知关卡");
+    return { names, stageName };
   }
 
-  function compressSequence(ids, names = new Map()) {
-    const groups = [];
-    for (const id of ids) {
-      const last = groups.at(-1);
-      if (last?.id === id) last.count++;
-      else groups.push({ id, count: 1 });
-    }
-    return groups.map(({ id, count }) => {
-      const name = names.get(id) || id;
-      return `${id} ${name}${count > 1 ? `×${count}` : ""}`;
-    }).join(" → ");
+  // testable:buildStrategySummary
+  function buildStrategySummary(strategy, stageName, names = new Map()) {
+    const team = Array.isArray(strategy.team) ? strategy.team : [];
+    const roster = team.map((entry) => {
+      const name = names.get(String(entry.id)) || "未知猫咪";
+      return `${name} Lv.${entry.level}`;
+    }).join("；");
+    return [
+      `策略名称：${strategy.name || "未命名"}`,
+      `适用关卡：${stageName || "未知关卡"}`,
+      `策略队伍：${roster || "未指定"}`,
+    ].join("\n");
   }
+  // end testable:buildStrategySummary
 
   function validateStrategy(strategy, runtime, names = null) {
     const messages = [`策略：${strategy.name || "未命名"}`];
     const nameMap = names ?? new Map((runtime.context?.team ?? []).map((entry) => [entry.id, entry.name]));
     const describe = (id) => `${id} ${nameMap.get(id) || ""}`.trim();
-    messages.push(...strategyRosterLines(strategy, nameMap));
     if (Math.abs(Number(strategy.policy?.actionGap ?? ACTION_GAP_MS / 1000) - ACTION_GAP_MS / 1000) > 1e-9) {
       messages.push(`警告：策略 actionGap=${strategy.policy.actionGap}s，执行器固定 ${ACTION_GAP_MS}ms，节奏会不一致。`);
     }
@@ -1913,6 +2022,7 @@
         if (props && typeof props === "object" && "seed" in props && "stage" in props && Array.isArray(props.team)) {
           context = {
             stageId: Number(props.stage?.id),
+            stageName: String(props.stage?.name ?? ""),
             team: props.team.map((entry, slot) => {
               const cat = entry?.cat ?? {};
               return {
