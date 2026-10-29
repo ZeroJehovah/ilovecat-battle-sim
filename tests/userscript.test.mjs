@@ -23,7 +23,7 @@ test("the userscript is syntactically valid and exposes both workflows", () => {
   assert.doesNotThrow(() => new Function(source));
   assert.match(source, /@match\s+https:\/\/api\.ilovecat520\.me\/\*/);
   assert.match(source, /@updateURL\s+https:\/\/raw\.githubusercontent\.com\/ZeroJehovah\/ilovecat-battle-sim\/main\/tools\/ilovecat-workbench\.user\.js/);
-  assert.match(source, /USERSCRIPT_VERSION = "0\.3\.6"/);
+  assert.match(source, /USERSCRIPT_VERSION = "0\.3\.7"/);
   assert.match(source, /<div class="title">喵喵的逆袭工具 <span class="version">v\$\{USERSCRIPT_VERSION\}<\/span><\/div>/);
   assert.match(source, /ilovecat-game-export/);
   assert.match(source, /ilovecat-battle-strategy/);
@@ -53,6 +53,7 @@ test("the userscript is syntactically valid and exposes both workflows", () => {
   assert.match(source, /适用关卡：/);
   assert.match(source, /策略配队：/);
   assert.match(source, /validation-line\.success/);
+  assert.doesNotMatch(source, /（成功）|（警告）|（错误）/);
   assert.match(source, /strategy-cat-name\.tier-s/);
   assert.match(source, /strategy-cat-level \{ color: #f7ead0; \}/);
   assert.match(source, /当前未处于战斗准备界面/);

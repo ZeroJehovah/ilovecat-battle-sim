@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         喵喵的逆袭 · 数据导出与策略执行
 // @namespace    https://github.com/ZeroJehovah/ilovecat-battle-sim
-// @version      0.3.6
+// @version      0.3.7
 // @description  按范围只读导出战斗数据与 JS，并按 JSON 策略操作战斗页面；支持空闲自动倍速
 // @match        https://api.ilovecat520.me/*
 // @updateURL    https://raw.githubusercontent.com/ZeroJehovah/ilovecat-battle-sim/main/tools/ilovecat-workbench.user.js
@@ -15,7 +15,7 @@
 
   const STRATEGY_FORMAT = "ilovecat-battle-strategy";
   const EXPORT_FORMAT = "ilovecat-game-export";
-  const USERSCRIPT_VERSION = "0.3.6";
+  const USERSCRIPT_VERSION = "0.3.7";
   const STORAGE_KEY = "ilovecat-workbench-strategy";
   const ACTION_GAP_MS = 250;
   const LOOP_MS = 100;
@@ -413,12 +413,11 @@
 
   function setValidationResults(results) {
     ui.runStatus.classList.remove("error", "ok");
-    const labels = { success: "成功", warning: "警告", error: "错误" };
     const fragment = document.createDocumentFragment();
     for (const result of results) {
       const line = document.createElement("div");
       line.className = `validation-line ${result.type}`;
-      line.textContent = `（${labels[result.type] || "信息"}）${result.text}`;
+      line.textContent = result.text;
       fragment.append(line);
     }
     ui.runStatus.replaceChildren(fragment);
