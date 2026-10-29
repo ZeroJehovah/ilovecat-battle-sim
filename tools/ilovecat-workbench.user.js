@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         喵喵的逆袭 · 数据导出与策略执行
 // @namespace    https://github.com/ZeroJehovah/ilovecat-battle-sim
-// @version      0.3.0
+// @version      0.3.1
 // @description  按范围只读导出战斗数据与 JS，并按 JSON 策略操作战斗页面；支持空闲自动倍速
 // @match        https://api.ilovecat520.me/*
 // @updateURL    https://raw.githubusercontent.com/ZeroJehovah/ilovecat-battle-sim/main/tools/ilovecat-workbench.user.js
@@ -15,7 +15,7 @@
 
   const STRATEGY_FORMAT = "ilovecat-battle-strategy";
   const EXPORT_FORMAT = "ilovecat-game-export";
-  const USERSCRIPT_VERSION = "0.3.0";
+  const USERSCRIPT_VERSION = "0.3.1";
   const STORAGE_KEY = "ilovecat-workbench-strategy";
   const ACTION_GAP_MS = 250;
   const LOOP_MS = 100;
@@ -177,6 +177,7 @@
                 <button class="stage-all" type="button">全选</button>
                 <button class="stage-none" type="button">清空</button>
                 <button class="stage-endless" type="button">仅当前无尽</button>
+                <button class="stage-raid" type="button">仅限时活动</button>
               </span>
             </div>
             <div class="stage-list" role="group" aria-label="导出关卡"><div class="stage-empty">正在读取页面关卡…</div></div>
@@ -235,6 +236,7 @@
       stageAll: root.querySelector(".stage-all"),
       stageNone: root.querySelector(".stage-none"),
       stageEndless: root.querySelector(".stage-endless"),
+      stageRaid: root.querySelector(".stage-raid"),
       copyExport: root.querySelector(".copy-export"),
       downloadExport: root.querySelector(".download-export"),
       downloadSnapshot: root.querySelector(".download-snapshot"),
@@ -313,6 +315,7 @@
     ui.stageAll.addEventListener("click", () => setStageSelection("all"));
     ui.stageNone.addEventListener("click", () => setStageSelection("none"));
     ui.stageEndless.addEventListener("click", () => setStageSelection("endless"));
+    ui.stageRaid.addEventListener("click", () => setStageSelection("raid"));
     ui.stageList.addEventListener("change", updateExportControls);
     ui.validate.addEventListener("click", () => runBusy(() => validateFromUi()));
     ui.loadStrategy.addEventListener("click", () => ui.strategyFile.click());
@@ -398,18 +401,27 @@
   }
 
   // testable:buildStageEntries
-  function buildStageEntries(catalog, endless) {
+  function buildStageEntries(catalog, endless, raid) {
     const entries = [];
     const seen = new Set();
-    const add = (stage, kind, endlessMeta = null) => {
+    const add = (stage, kind, endlessMeta = null, raidMeta = null) => {
       if (stage?.id == null) return;
       const key = `${kind}:${stage.id}`;
       if (seen.has(key)) return;
       seen.add(key);
-      entries.push({ key, kind, stage, endlessMeta });
+      entries.push({ key, kind, stage, endlessMeta, raidMeta });
     };
     add(endless?.stage, "endless", endless
       ? { season: endless.season, ends: endless.ends }
+      : null);
+    const activeRaid = raid?.stage && raid.ended !== true ? raid : null;
+    add(activeRaid?.stage, "raid", null, activeRaid
+      ? {
+        eventId: activeRaid.raid?.id ?? null,
+        starts: activeRaid.raid?.start ?? null,
+        ends: activeRaid.raid?.end ?? null,
+        running: Boolean(activeRaid.running),
+      }
       : null);
     for (const stage of catalog?.stages ?? []) add(stage, "campaign");
     return entries;
@@ -420,35 +432,60 @@
   function buildSelectedSnapshot({ catalog, selectedStages, includeCatalog, capturedAt, source }) {
     const campaign = selectedStages.filter((entry) => entry.kind === "campaign");
     const endless = selectedStages.find((entry) => entry.kind === "endless") ?? null;
+    const raid = selectedStages.find((entry) => entry.kind === "raid") ?? null;
+    const catalogStages = selectedStages.filter((entry) => entry.kind !== "endless");
     const snapshot = { schemaVersion: 1, capturedAt, source };
     if (includeCatalog) {
       snapshot.catalog = {};
       for (const key of ["cats", "mice", "items", "rules"]) {
         if (catalog?.[key] !== undefined) snapshot.catalog[key] = catalog[key];
       }
-      if (campaign.length) snapshot.catalog.stages = campaign.map((entry) => entry.stage);
+      if (catalogStages.length) snapshot.catalog.stages = catalogStages.map((entry) => entry.stage);
     }
-    const primary = endless?.stage ?? campaign[0]?.stage ?? null;
+    const primary = endless?.stage ?? raid?.stage ?? campaign[0]?.stage ?? null;
     if (primary) snapshot.stage = primary;
     if (endless?.endlessMeta) snapshot.endlessMeta = endless.endlessMeta;
+    if (raid?.raidMeta) snapshot.raidMeta = raid.raidMeta;
     return snapshot;
   }
   // end testable:buildSelectedSnapshot
+
+  async function loadStageSources({ includeState = false } = {}) {
+    const raidRequest = apiGet("raid").then(
+      (data) => ({ data, error: null }),
+      (error) => ({ data: null, error }),
+    );
+    const requests = [apiGet("catalog"), apiGet("endless"), raidRequest];
+    if (includeState) requests.push(apiGet("state"));
+    const [catalog, endless, raidResult, state = null] = await Promise.all(requests);
+    if (!catalog) throw new Error("接口返回缺少 catalog。");
+    if (includeState && !state) throw new Error("接口返回缺少 state。");
+    return {
+      catalog,
+      endless,
+      state,
+      raid: raidResult.data,
+      raidError: raidResult.error,
+    };
+  }
 
   async function ensureStageOptions() {
     if (stageOptions) return stageOptions;
     if (stageOptionsPromise) return stageOptionsPromise;
     stageOptionsPromise = (async () => {
       setExportStatus("正在读取页面可选关卡…");
-      const [catalog, endless] = await Promise.all([apiGet("catalog"), apiGet("endless")]);
-      if (!catalog) throw new Error("接口返回缺少 catalog，无法列出关卡。");
-      const entries = buildStageEntries(catalog, endless);
+      const sources = await loadStageSources();
+      const { catalog, endless, raid, raidError } = sources;
+      const entries = buildStageEntries(catalog, endless, raid);
       if (!entries.length) throw new Error("页面没有返回可导出的关卡。");
-      stageOptions = { catalog, endless, entries };
+      stageOptions = { ...sources, entries };
       renderStageOptions(entries);
       updateExportControls();
+      const campaignCount = entries.filter((entry) => entry.kind === "campaign").length;
       const endlessCount = entries.filter((entry) => entry.kind === "endless").length;
-      setExportStatus(`已读取 ${entries.length - endlessCount} 个普通关卡和 ${endlessCount} 个当前无尽关卡。`);
+      const raidCount = entries.filter((entry) => entry.kind === "raid").length;
+      const failed = raidError ? `\n限时全服头目读取失败：${raidError.message}` : "";
+      setExportStatus(`已读取 ${campaignCount} 个普通关卡、${endlessCount} 个当前无尽关卡和 ${raidCount} 个限时全服头目。${failed}`);
       return stageOptions;
     })().finally(() => {
       stageOptionsPromise = null;
@@ -473,13 +510,23 @@
       label.className = "stage-option";
       const kind = document.createElement("span");
       kind.className = "stage-kind";
-      kind.textContent = entry.kind === "endless" ? "当前无尽" : `关卡 ${entry.stage.id}`;
+      kind.textContent = entry.kind === "endless"
+        ? "当前无尽"
+        : entry.kind === "raid" ? "限时活动" : `关卡 ${entry.stage.id}`;
       const detail = document.createElement("span");
       const name = entry.stage.name || entry.stage.id;
       const waves = entry.stage.waves?.length ?? 0;
-      detail.textContent = entry.kind === "endless"
-        ? `${name} · id ${entry.stage.id} · ${waves} 波`
-        : `${name} · ${waves} 波`;
+      if (entry.kind === "raid") {
+        const starts = entry.raidMeta?.starts ? String(entry.raidMeta.starts).slice(5).replace("-", "/") : "";
+        const ends = entry.raidMeta?.ends ? String(entry.raidMeta.ends).slice(5).replace("-", "/") : "";
+        const range = starts && ends ? ` · ${starts}–${ends}` : "";
+        const state = entry.raidMeta?.running ? " · 进行中" : "";
+        detail.textContent = `${name} · id ${entry.stage.id} · ${waves} 波${range}${state}`;
+      } else {
+        detail.textContent = entry.kind === "endless"
+          ? `${name} · id ${entry.stage.id} · ${waves} 波`
+          : `${name} · ${waves} 波`;
+      }
       label.title = `${kind.textContent}：${detail.textContent}`;
       label.append(input, kind, detail);
       fragment.append(label);
@@ -498,7 +545,8 @@
   function setStageSelection(mode) {
     for (const input of ui.stageList.querySelectorAll('input[type="checkbox"]')) {
       input.checked = mode === "all"
-        || (mode === "endless" && input.value.startsWith("endless:"));
+        || (mode === "endless" && input.value.startsWith("endless:"))
+        || (mode === "raid" && input.value.startsWith("raid:"));
     }
     updateExportControls();
   }
@@ -554,17 +602,20 @@
       || selection.jsScope !== "none";
     if (!hasData) throw new Error("至少选择一项导出内容。");
     setExportStatus("正在读取所选数据和页面关卡…");
-    const requests = [apiGet("catalog"), apiGet("endless")];
-    if (needsState) requests.push(apiGet("state"));
-    const [catalog, endless, state = null] = await Promise.all(requests);
-    if (!catalog) throw new Error("接口返回缺少 catalog。");
-    if (needsState && !state) throw new Error("接口返回缺少 state。");
-
-    const entries = buildStageEntries(catalog, endless);
-    stageOptions = { catalog, endless, entries };
+    const sources = await loadStageSources({ includeState: needsState });
+    const { catalog, state, raid, raidError } = sources;
+    const entries = buildStageEntries(catalog, sources.endless, raid);
+    stageOptions = { ...sources, entries };
     renderStageOptions(entries);
     const allowedKeys = new Set(entries.map((entry) => entry.key));
     const selectedStages = entries.filter((entry) => selection.stageKeys.includes(entry.key));
+    const wantsRaid = selection.stageKeys.some((key) => key.startsWith("raid:"));
+    if (wantsRaid && raidError) {
+      throw new Error(`所选限时全服头目读取失败：${raidError.message}`);
+    }
+    if (wantsRaid && !selectedStages.some((entry) => entry.kind === "raid")) {
+      throw new Error("所选限时全服头目已结束或当前不可用，请重新勾选。");
+    }
     if (selection.stageKeys.some((key) => !allowedKeys.has(key))) {
       throw new Error("所选关卡已不在当前页面数据中，请重新勾选。");
     }
