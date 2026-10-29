@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         喵喵的逆袭 · 数据导出与策略执行
 // @namespace    https://github.com/ZeroJehovah/ilovecat-battle-sim
-// @version      0.3.3
+// @version      0.3.4
 // @description  按范围只读导出战斗数据与 JS，并按 JSON 策略操作战斗页面；支持空闲自动倍速
 // @match        https://api.ilovecat520.me/*
 // @updateURL    https://raw.githubusercontent.com/ZeroJehovah/ilovecat-battle-sim/main/tools/ilovecat-workbench.user.js
@@ -15,7 +15,7 @@
 
   const STRATEGY_FORMAT = "ilovecat-battle-strategy";
   const EXPORT_FORMAT = "ilovecat-game-export";
-  const USERSCRIPT_VERSION = "0.3.3";
+  const USERSCRIPT_VERSION = "0.3.4";
   const STORAGE_KEY = "ilovecat-workbench-strategy";
   const ACTION_GAP_MS = 250;
   const LOOP_MS = 100;
@@ -69,9 +69,11 @@
         .launcher {
           position: fixed; right: 14px; top: 76px; z-index: 2147483647;
           width: 46px; height: 46px; border-radius: 15px; border: 1px solid #5b4a32;
-          background: #f7e8c7; color: #4c351d; font-size: 23px; cursor: pointer;
+          display: grid; place-items: center; padding: 6px;
+          background: #f7e8c7; cursor: pointer;
           box-shadow: 0 8px 30px rgba(0,0,0,.35);
         }
+        .launcher svg { display: block; width: 30px; height: 30px; }
         .panel {
           position: fixed; right: 14px; top: 132px; z-index: 2147483647;
           width: min(520px, calc(100vw - 28px)); max-height: min(760px, calc(100vh - 150px));
@@ -82,6 +84,7 @@
         .panel[hidden], .view[hidden] { display: none !important; }
         .head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
         .title { font-size: 16px; font-weight: 750; }
+        .version { margin-left: 3px; color: #b9ad98; font-size: 12px; font-weight: 600; }
         .muted { color: #b9ad98; font-size: 12px; line-height: 1.55; }
         .tabs { display: flex; gap: 7px; margin: 12px 0; }
         .tabs button, .actions button, .close {
@@ -112,33 +115,29 @@
           margin: 10px 0; padding: 10px; border: 1px solid #3e4857;
           border-radius: 11px; background: #11161d;
         }
-        .scope-title { margin-bottom: 4px; font-size: 13px; font-weight: 750; }
-        .scope-heading {
-          display: flex; align-items: center; justify-content: space-between; gap: 8px;
-          margin: 11px 0 2px; color: #e7c98f; font-size: 12px; font-weight: 700;
-        }
         .scope-card label.check { margin: 6px 0; }
-        .scope-card label.radio { align-items: flex-start; line-height: 1.4; }
-        .scope-card input[type="radio"] { margin-top: 3px; }
-        .stage-tools { display: flex; flex-wrap: wrap; gap: 5px; }
-        .stage-tools button {
-          border: 1px solid #5e513d; border-radius: 7px; background: #252d37;
-          color: #f7ead0; padding: 3px 7px; font-size: 11px; cursor: pointer;
-        }
-        .stage-list {
-          max-height: 190px; overflow: auto; margin: 5px 0 2px; padding: 4px;
-          border: 1px solid #303946; border-radius: 8px; background: #0e1218;
-        }
+        .scope-card label.radio { line-height: 1.4; }
+        .stage-choices { margin: 5px 0 2px; }
         .stage-option {
-          display: flex; align-items: flex-start; gap: 7px; padding: 5px 6px;
+          display: flex; align-items: center; gap: 7px; padding: 4px 0;
           border-radius: 6px; font-size: 12px; line-height: 1.35; cursor: pointer;
         }
-        .stage-option:hover { background: #1c232d; }
-        .stage-option input { margin-top: 2px; }
         .stage-kind { color: #f0b95c; font-weight: 700; }
-        .stage-empty { padding: 8px; color: #b9ad98; font-size: 12px; }
-        .stage-summary { margin: 5px 0 0; }
-        .scope-note { margin: 7px 0 0; }
+        .fixed-stages {
+          display: flex; align-items: center; gap: 8px; margin: 7px 0 4px;
+          color: #e7c98f; font-size: 12px; font-weight: 700;
+        }
+        .fixed-stage-input {
+          flex: 1; min-width: 0; border: 1px solid #4e5866; border-radius: 7px;
+          background: #0e1218; color: #e8eef6; padding: 5px 8px; font-size: 12px;
+        }
+        .js-scope-row {
+          display: flex; align-items: center; gap: 10px; margin-top: 9px;
+          color: #e7c98f; font-size: 12px; font-weight: 700; white-space: nowrap;
+        }
+        .js-scope-row label.check { margin: 0; color: #f7ead0; font-weight: 400; }
+        .execute-options { display: flex; align-items: center; gap: 18px; margin: 10px 0; white-space: nowrap; }
+        .execute-options label.check { margin: 0; }
         .item-warning {
           margin: 8px 0 0; padding: 8px 10px; border-radius: 8px;
           border: 1px solid #8a4b2a; background: #2a1b14; color: #ffc38a;
@@ -149,13 +148,24 @@
         .copy-fallback { margin-top: 10px; }
         .copy-fallback textarea { min-height: 150px; }
       </style>
-      <button class="launcher" title="喵喵的逆袭工具">🐱</button>
+      <!-- Cat face icon: https://github.com/jdecked/twemoji/blob/main/assets/svg/1f431.svg, © Twitter, Inc and other contributors, CC-BY 4.0. -->
+      <button class="launcher" title="喵喵的逆袭工具" aria-label="打开喵喵的逆袭工具">
+        <svg viewBox="0 0 36 36" aria-hidden="true">
+          <path fill="#FFCC4D" d="M32.348 13.999s3.445-8.812 1.651-11.998c-.604-1.073-8 1.998-10.723 5.442 0 0-2.586-.86-5.276-.86s-5.276.86-5.276.86C10.001 3.999 2.605.928 2.001 2.001.207 5.187 3.652 13.999 3.652 13.999c-.897 1.722-1.233 4.345-1.555 7.16-.354 3.086.35 5.546.658 6.089.35.617 2.123 2.605 4.484 4.306 3.587 2.583 8.967 3.445 10.761 3.445s7.174-.861 10.761-3.445c2.361-1.701 4.134-3.689 4.484-4.306.308-.543 1.012-3.003.659-6.089-.324-2.814-.659-5.438-1.556-7.16z"/>
+          <path fill="#F18F26" d="M2.359 2.971c.2-.599 5.348 2.173 6.518 5.404 0 0-3.808 2.624-4.528 4.624 0 0-2.99-7.028-1.99-10.028z"/>
+          <path fill="#FFCC4D" d="M5.98 7.261c0-1.414 5.457 2.733 4.457 3.733s-1.255.72-2.255 1.72S5.98 8.261 5.98 7.261z"/>
+          <path fill="#F18F26" d="M33.641 2.971c-.2-.599-5.348 2.173-6.518 5.404 0 0 3.808 2.624 4.528 4.624 0 0 2.99-7.028 1.99-10.028z"/>
+          <path fill="#FFCC4D" d="M30.02 7.261c0-1.414-5.457 2.733-4.457 3.733s1.255.72 2.255 1.72 2.202-4.453 2.202-5.453z"/>
+          <path fill="#292F33" d="M14.001 20.001c0 1.105-.896 1.999-2 1.999s-2-.894-2-1.999c0-1.104.896-1.999 2-1.999s2 .896 2 1.999zm11.998 0c0 1.105-.896 1.999-2 1.999-1.105 0-2-.894-2-1.999 0-1.104.895-1.999 2-1.999s2 .896 2 1.999z"/>
+          <path fill="#FEE7B8" d="M2.201 30.458c-.148 0-.294-.065-.393-.19-.171-.217-.134-.531.083-.702.162-.127 4.02-3.12 10.648-2.605.275.021.481.261.46.536-.021.275-.257.501-.537.46-6.233-.474-9.915 2.366-9.951 2.395-.093.07-.202.106-.31.106zm8.868-4.663c-.049 0-.1-.007-.149-.022-4.79-1.497-8.737-.347-8.777-.336-.265.081-.543-.07-.623-.335-.079-.265.071-.543.335-.622.173-.052 4.286-1.247 9.362.338.264.083.411.363.328.627-.066.213-.263.35-.476.35zm22.73 4.663c.148 0 .294-.065.393-.19.171-.217.134-.531-.083-.702-.162-.127-4.02-3.12-10.648-2.605-.275.021-.481.261-.46.536.022.275.257.501.537.46 6.233-.474 9.915 2.366 9.951 2.395.093.07.202.106.31.106zm-8.868-4.663c.049 0 .1-.007.149-.022 4.79-1.497 8.737-.347 8.777-.336.265.081.543-.07.623-.335.079-.265-.071-.543-.335-.622-.173-.052-4.286-1.247-9.362.338-.264.083-.411.363-.328.627.066.213.263.35.476.35z"/>
+          <path fill="#67757F" d="M24.736 30.898c-.097-.258-.384-.392-.643-.294-.552.206-1.076.311-1.559.311-1.152 0-1.561-.306-2.033-.659-.451-.338-.956-.715-1.99-.803v-2.339c0-.276-.224-.5-.5-.5s-.5.224-.5.5v2.373c-.81.115-1.346.439-1.816.743-.568.367-1.059.685-2.083.685-.482 0-1.006-.104-1.558-.311-.258-.095-.547.035-.643.294-.097.259.035.547.293.644.664.247 1.306.373 1.907.373 1.319 0 2.014-.449 2.627-.845.524-.339.98-.631 1.848-.635.992.008 1.358.278 1.815.621.538.403 1.147.859 2.633.859.601 0 1.244-.126 1.908-.373.259-.097.391-.385.294-.644z"/>
+          <path fill="#E75A70" d="M19.4 24.807h-2.8c-.64 0-1.163.523-1.163 1.163 0 .639.523 1.163 1.163 1.163h.237v.345c0 .639.523 1.163 1.163 1.163s1.163-.523 1.163-1.163v-.345h.237c.639 0 1.163-.523 1.163-1.163s-.524-1.163-1.163-1.163z"/>
+          <path fill="#F18F26" d="M18.022 17.154c-.276 0-.5-.224-.5-.5V8.37c0-.276.224-.5.5-.5s.5.224.5.5v8.284c0 .277-.223.5-.5.5zM21 15.572c-.276 0-.5-.224-.5-.5 0-2.882 1.232-5.21 1.285-5.308.13-.244.435-.334.677-.204.243.13.334.433.204.677-.012.021-1.166 2.213-1.166 4.835 0 .276-.224.5-.5.5zm-6 0c-.276 0-.5-.224-.5-.5 0-2.623-1.155-4.814-1.167-4.835-.13-.244-.038-.546.205-.677.242-.131.545-.039.676.204.053.098 1.285 2.426 1.285 5.308.001.276-.223.5-.499.5z"/>
+        </svg>
+      </button>
       <section class="panel" hidden>
         <div class="head">
-          <div>
-            <div class="title">喵喵的逆袭工具</div>
-            <div class="muted">v${USERSCRIPT_VERSION} · 只读导出；执行器只操作页面按钮和游戏键盘事件</div>
-          </div>
+          <div class="title">喵喵的逆袭工具 <span class="version">v${USERSCRIPT_VERSION}</span></div>
           <button class="close" title="收起">×</button>
         </div>
         <div class="tabs">
@@ -163,35 +173,24 @@
           <button data-tab="execute">执行策略</button>
         </div>
         <div class="view" data-view="export">
-          <p class="muted">复制和下载共用下面的范围。仅选择这次真正需要的数据；导出内容不会上传，登录 UID 和请求头不会写入结果。</p>
           <div class="scope-card">
-            <div class="scope-title">导出范围</div>
             <label class="check"><input class="include-catalog" type="checkbox" checked> 图鉴基础数据（猫、鼠、道具、规则）</label>
-            <div class="scope-heading"><span>可选账号信息（不会进入 snapshot）</span></div>
             <label class="check"><input class="include-owned" type="checkbox"> 已拥有猫咪的等级列表（用于分析可用阵容）</label>
-            <div class="scope-heading">
-              <span>页面关卡（逐关勾选）</span>
-              <span class="stage-tools">
-                <button class="stage-all" type="button">全选</button>
-                <button class="stage-none" type="button">清空</button>
-                <button class="stage-endless" type="button">仅当前无尽</button>
-                <button class="stage-raid" type="button">仅限时活动</button>
-              </span>
+            <div class="stage-choices" role="group" aria-label="页面活动关卡"></div>
+            <label class="fixed-stages">固定关卡
+              <input class="fixed-stage-input" type="text" autocomplete="off" spellcheck="false" placeholder="关卡 id，例如 1,2,3" aria-label="固定关卡 id，例如 1,2,3">
+            </label>
+            <div class="js-scope-row" role="radiogroup" aria-label="JS 源码">
+              <span>JS源码：</span>
+              <label class="check radio"><input class="js-scope" type="radio" name="export-js-scope" value="none" checked> 无</label>
+              <label class="check radio"><input class="js-scope" type="radio" name="export-js-scope" value="battle"> 战斗逻辑</label>
+              <label class="check radio"><input class="js-scope" type="radio" name="export-js-scope" value="all"> 全部</label>
             </div>
-            <div class="stage-list" role="group" aria-label="导出关卡"><div class="stage-empty">正在读取页面关卡…</div></div>
-            <p class="muted stage-summary">尚未读取关卡。</p>
-            <div class="scope-heading">战斗逻辑 JS 源码（可选）</div>
-            <label class="check radio"><input class="js-scope" type="radio" name="export-js-scope" value="none" checked> 不导出 JS（只取数据时推荐）</label>
-            <label class="check radio"><input class="js-scope" type="radio" name="export-js-scope" value="battle"> 仅战斗逻辑 JS（正文、大小和 SHA-256）</label>
-            <label class="check radio"><input class="js-scope" type="radio" name="export-js-scope" value="all"> 战斗逻辑 JS + 全部同源已加载 JS 正文</label>
-            <p class="muted scope-note">这不是战斗记录，而是游戏当前版本的战斗代码 bundle。导出时不需要正在战斗，但当前标签页必须已经加载过战斗界面；首次打开或刷新页面后通常要先进入一次战斗，让浏览器载入该 JS。</p>
-            <p class="muted scope-note">“全部同源已加载 JS”会写入当前页面加载过的每个同源 .js 完整正文，通常有数 MiB；只做数据或关卡分析时保持“不导出”即可。</p>
           </div>
           <div class="actions">
             <button class="primary copy-export">复制所选 JSON</button>
             <button class="download-export">下载所选 JSON</button>
           </div>
-          <p class="muted scope-note">所选 JSON 的 snapshot 字段就是模拟器 data/snapshot.json 所需结构；需要图鉴和至少 1 个关卡才能直接运行，账号信息和 JS 不会进入该字段。</p>
           <div class="copy-fallback" hidden>
             <p class="muted">自动复制失败。文本框中的内容已选中，请按 Ctrl+C。</p>
             <textarea readonly></textarea>
@@ -199,14 +198,13 @@
           <pre class="status export-status">尚未读取。</pre>
         </div>
         <div class="view" data-view="execute" hidden>
-          <p class="muted">先按策略配置好队伍和道具，再把策略 JSON 粘贴到这里。已在战斗中时直接执行；停留在“出战”准备界面时，可授权脚本点击“开始战斗”。执行器从 React 战斗快照读取金币、存活数量和冷却，通过页面按钮操作；不会直接修改战斗状态。</p>
           <textarea spellcheck="false" placeholder="粘贴 ilovecat-battle-strategy JSON"></textarea>
           <input class="strategy-file" type="file" accept=".json,application/json" hidden>
-          <label class="check warning"><input class="auto-start" type="checkbox"> 无战斗时由脚本点击“开始战斗”（消耗 1 次挑战）</label>
+          <div class="execute-options">
+            <label class="check warning"><input class="auto-start" type="checkbox"> 自动开始战斗</label>
+            <label class="check"><input class="auto-speed" type="checkbox"> 自动倍速</label>
+          </div>
           <p class="item-warning" hidden></p>
-          <label class="check warning"><input class="auto-items" type="checkbox"> 自动勾选策略所需消耗品（会消耗库存）</label>
-          <label class="check"><input class="auto-speed" type="checkbox"> 自动倍速（空闲 3×，动作前切回 1×）</label>
-          <p class="muted">仅在估计至少约 9 个游戏秒内没有操作时切到 3×；2×/3× 时执行器不会执行任何策略动作。开战时会把游戏保存的起始倍速设为 1×。</p>
           <div class="actions">
             <button class="load-strategy">导入 JSON 文件</button>
             <button class="validate">校验</button>
@@ -214,7 +212,6 @@
             <button class="danger stop">停止</button>
           </div>
           <pre class="status run-status">未执行。</pre>
-          <p class="muted warning">自动开战只会在关卡名称、队伍前几槽和道具都与策略一致时点击准备界面的“开始战斗”；不会调整队伍、使用道具或选择服务器种子。点击后仍有少量网络与渲染延迟。</p>
         </div>
       </section>`;
     return {
@@ -227,12 +224,8 @@
       includeCatalog: root.querySelector(".include-catalog"),
       includeOwned: root.querySelector(".include-owned"),
       jsScopes: [...root.querySelectorAll(".js-scope")],
-      stageList: root.querySelector(".stage-list"),
-      stageSummary: root.querySelector(".stage-summary"),
-      stageAll: root.querySelector(".stage-all"),
-      stageNone: root.querySelector(".stage-none"),
-      stageEndless: root.querySelector(".stage-endless"),
-      stageRaid: root.querySelector(".stage-raid"),
+      stageChoices: root.querySelector(".stage-choices"),
+      fixedStages: root.querySelector(".fixed-stage-input"),
       copyExport: root.querySelector(".copy-export"),
       downloadExport: root.querySelector(".download-export"),
       copyFallback: root.querySelector(".copy-fallback"),
@@ -241,7 +234,6 @@
       strategy: root.querySelector('[data-view="execute"] textarea'),
       strategyFile: root.querySelector(".strategy-file"),
       autoStart: root.querySelector(".auto-start"),
-      autoItems: root.querySelector(".auto-items"),
       autoSpeed: root.querySelector(".auto-speed"),
       itemWarning: root.querySelector(".item-warning"),
       loadStrategy: root.querySelector(".load-strategy"),
@@ -289,14 +281,11 @@
       download(`ilovecat-export-${stamp()}.json`, text);
       setExportStatus(`已下载所选 JSON（${formatBytes(text.length)}）。`);
     }));
-    for (const control of [ui.includeCatalog, ui.includeOwned, ...ui.jsScopes]) {
+    for (const control of [ui.includeCatalog, ui.includeOwned, ui.fixedStages, ...ui.jsScopes]) {
       control.addEventListener("change", updateExportControls);
     }
-    ui.stageAll.addEventListener("click", () => setStageSelection("all"));
-    ui.stageNone.addEventListener("click", () => setStageSelection("none"));
-    ui.stageEndless.addEventListener("click", () => setStageSelection("endless"));
-    ui.stageRaid.addEventListener("click", () => setStageSelection("raid"));
-    ui.stageList.addEventListener("change", updateExportControls);
+    ui.fixedStages.addEventListener("input", updateExportControls);
+    ui.stageChoices.addEventListener("change", updateExportControls);
     ui.validate.addEventListener("click", () => runBusy(() => validateFromUi()));
     ui.loadStrategy.addEventListener("click", () => ui.strategyFile.click());
     ui.strategyFile.addEventListener("change", () => runBusy(async () => {
@@ -310,14 +299,6 @@
     }));
     ui.run.addEventListener("click", () => runBusy(() => startFromUi()));
     ui.stop.addEventListener("click", () => stopExecutor("用户停止。"));
-    ui.autoItems.addEventListener("change", () => {
-      try {
-        const strategy = parseStrategy(ui.strategy.value);
-        updateItemWarning(strategy, findPreparationRuntime(strategy));
-      } catch {
-        // Keep the previous warning when the textarea is not yet valid JSON.
-      }
-    });
     ui.autoSpeed.addEventListener("change", () => {
       if (!executor) return;
       executor.autoSpeedTarget = 1;
@@ -380,7 +361,7 @@
   }
 
   // testable:buildStageEntries
-  function buildStageEntries(catalog, endless, raid) {
+  function buildStageEntries(catalog, endless, raid, daily) {
     const entries = [];
     const seen = new Set();
     const add = (stage, kind, endlessMeta = null, raidMeta = null) => {
@@ -393,6 +374,11 @@
     add(endless?.stage, "endless", endless
       ? { season: endless.season, ends: endless.ends }
       : null);
+    for (const stage of daily?.choices ?? []) {
+      add(stage, "daily");
+      const entry = entries.at(-1);
+      if (entry?.key === "daily:" + stage.id) entry.dailyChosen = daily.chosen === stage.daily;
+    }
     const activeRaid = raid?.stage && raid.ended !== true ? raid : null;
     add(activeRaid?.stage, "raid", null, activeRaid
       ? {
@@ -411,6 +397,9 @@
   function buildSelectedSnapshot({ catalog, selectedStages, includeCatalog, capturedAt, source }) {
     const campaign = selectedStages.filter((entry) => entry.kind === "campaign");
     const endless = selectedStages.find((entry) => entry.kind === "endless") ?? null;
+    const daily = selectedStages.find((entry) => entry.kind === "daily" && entry.dailyChosen)
+      ?? selectedStages.find((entry) => entry.kind === "daily")
+      ?? null;
     const raid = selectedStages.find((entry) => entry.kind === "raid") ?? null;
     const catalogStages = selectedStages.filter((entry) => entry.kind !== "endless");
     const snapshot = { schemaVersion: 1, capturedAt, source };
@@ -421,7 +410,7 @@
       }
       if (catalogStages.length) snapshot.catalog.stages = catalogStages.map((entry) => entry.stage);
     }
-    const primary = endless?.stage ?? raid?.stage ?? campaign[0]?.stage ?? null;
+    const primary = endless?.stage ?? daily?.stage ?? raid?.stage ?? campaign[0]?.stage ?? null;
     if (primary) snapshot.stage = primary;
     if (endless?.endlessMeta) snapshot.endlessMeta = endless.endlessMeta;
     if (raid?.raidMeta) snapshot.raidMeta = raid.raidMeta;
@@ -429,20 +418,28 @@
   }
   // end testable:buildSelectedSnapshot
 
-  async function loadStageSources({ includeState = false } = {}) {
+  async function loadStageSources({ requireState = false } = {}) {
     const raidRequest = apiGet("raid").then(
       (data) => ({ data, error: null }),
       (error) => ({ data: null, error }),
     );
-    const requests = [apiGet("catalog"), apiGet("endless"), raidRequest];
-    if (includeState) requests.push(apiGet("state"));
-    const [catalog, endless, raidResult, state = null] = await Promise.all(requests);
+    const stateRequest = apiGet("state").then(
+      (data) => ({ data, error: null }),
+      (error) => ({ data: null, error }),
+    );
+    const [catalog, endless, raidResult, stateResult] = await Promise.all([
+      apiGet("catalog"),
+      apiGet("endless"),
+      raidRequest,
+      stateRequest,
+    ]);
     if (!catalog) throw new Error("接口返回缺少 catalog。");
-    if (includeState && !state) throw new Error("接口返回缺少 state。");
+    if (requireState && !stateResult.data) throw new Error("接口返回缺少 state。");
     return {
       catalog,
       endless,
-      state,
+      state: stateResult.data,
+      stateError: stateResult.error,
       raid: raidResult.data,
       raidError: raidResult.error,
     };
@@ -454,17 +451,21 @@
     stageOptionsPromise = (async () => {
       setExportStatus("正在读取页面可选关卡…");
       const sources = await loadStageSources();
-      const { catalog, endless, raid, raidError } = sources;
-      const entries = buildStageEntries(catalog, endless, raid);
+      const { catalog, endless, raid, raidError, state, stateError } = sources;
+      const entries = buildStageEntries(catalog, endless, raid, state?.daily);
       if (!entries.length) throw new Error("页面没有返回可导出的关卡。");
       stageOptions = { ...sources, entries };
       renderStageOptions(entries);
       updateExportControls();
       const campaignCount = entries.filter((entry) => entry.kind === "campaign").length;
       const endlessCount = entries.filter((entry) => entry.kind === "endless").length;
+      const dailyCount = entries.filter((entry) => entry.kind === "daily").length;
       const raidCount = entries.filter((entry) => entry.kind === "raid").length;
-      const failed = raidError ? `\n限时全服头目读取失败：${raidError.message}` : "";
-      setExportStatus(`已读取 ${campaignCount} 个普通关卡、${endlessCount} 个当前无尽关卡和 ${raidCount} 个限时全服头目。${failed}`);
+      const failed = [
+        stateError ? `每日任务读取失败：${stateError.message}` : "",
+        raidError ? `限时全服头目读取失败：${raidError.message}` : "",
+      ].filter(Boolean).join("\n");
+      setExportStatus(`已读取 ${campaignCount} 个普通关卡、${endlessCount} 个当前无尽关卡、${dailyCount} 个每日任务关卡和 ${raidCount} 个限时全服头目。${failed ? "\n" + failed : ""}`);
       return stageOptions;
     })().finally(() => {
       stageOptionsPromise = null;
@@ -473,13 +474,14 @@
   }
 
   function renderStageOptions(entries) {
+    const visibleEntries = entries.filter((entry) => entry.kind !== "campaign");
     const selectedBefore = new Set(
-      [...ui.stageList.querySelectorAll('input[type="checkbox"]')].map((input) => input.value),
+      [...ui.stageChoices.querySelectorAll('input[type="checkbox"]')].map((input) => input.value),
     );
     const hadOptions = previousStageKeys.length > 0;
     const previouslyAll = hadOptions && selectedBefore.size === previousStageKeys.length;
     const fragment = document.createDocumentFragment();
-    for (const entry of entries) {
+    for (const entry of visibleEntries) {
       const input = document.createElement("input");
       input.type = "checkbox";
       input.value = entry.key;
@@ -491,68 +493,58 @@
       kind.className = "stage-kind";
       kind.textContent = entry.kind === "endless"
         ? "当前无尽"
-        : entry.kind === "raid" ? "限时活动" : `关卡 ${entry.stage.id}`;
+        : entry.kind === "daily" ? "每日任务" : "限时活动";
       const detail = document.createElement("span");
-      const name = entry.stage.name || entry.stage.id;
-      const waves = entry.stage.waves?.length ?? 0;
-      if (entry.kind === "raid") {
-        const starts = entry.raidMeta?.starts ? String(entry.raidMeta.starts).slice(5).replace("-", "/") : "";
-        const ends = entry.raidMeta?.ends ? String(entry.raidMeta.ends).slice(5).replace("-", "/") : "";
-        const range = starts && ends ? ` · ${starts}–${ends}` : "";
-        const state = entry.raidMeta?.running ? " · 进行中" : "";
-        detail.textContent = `${name} · id ${entry.stage.id} · ${waves} 波${range}${state}`;
-      } else {
-        detail.textContent = entry.kind === "endless"
-          ? `${name} · id ${entry.stage.id} · ${waves} 波`
-          : `${name} · ${waves} 波`;
-      }
+      detail.textContent = entry.stage.name || "未命名关卡";
       label.title = `${kind.textContent}：${detail.textContent}`;
       label.append(input, kind, detail);
       fragment.append(label);
     }
-    if (!entries.length) {
-      const empty = document.createElement("div");
-      empty.className = "stage-empty";
-      empty.textContent = "页面没有返回可导出的关卡。";
-      fragment.append(empty);
-    }
-    ui.stageList.replaceChildren(fragment);
-    previousStageKeys = entries.map((entry) => entry.key);
+    ui.stageChoices.replaceChildren(fragment);
+    previousStageKeys = visibleEntries.map((entry) => entry.key);
     updateExportControls();
   }
 
-  function setStageSelection(mode) {
-    for (const input of ui.stageList.querySelectorAll('input[type="checkbox"]')) {
-      input.checked = mode === "all"
-        || (mode === "endless" && input.value.startsWith("endless:"))
-        || (mode === "raid" && input.value.startsWith("raid:"));
+  // testable:parseFixedStageIds
+  function parseFixedStageIds(value) {
+    const text = String(value ?? "").trim();
+    if (!text) return [];
+    const ids = [];
+    for (const token of text.split(/[,，\s]+/u).filter(Boolean)) {
+      if (!/^\d+$/.test(token)) {
+        throw new Error("固定关卡格式有误：“" + token + "”；请输入关卡 id，例如 1,2,3。");
+      }
+      const id = Number(token);
+      if (!Number.isSafeInteger(id) || id < 1) {
+        throw new Error("固定关卡 id 无效：“" + token + "”。");
+      }
+      if (!ids.includes(id)) ids.push(id);
     }
-    updateExportControls();
+    return ids;
   }
+  // end testable:parseFixedStageIds
 
   function readExportSelection() {
+    const fixedStageKeys = parseFixedStageIds(ui.fixedStages.value)
+      .map((id) => "campaign:" + id);
     return {
       includeCatalog: ui.includeCatalog.checked,
       includeOwned: ui.includeOwned.checked,
-      stageKeys: [...ui.stageList.querySelectorAll('input[type="checkbox"]:checked')]
-        .map((input) => input.value),
+      stageKeys: [...new Set([
+        ...[...ui.stageChoices.querySelectorAll('input[type="checkbox"]:checked')]
+          .map((input) => input.value),
+        ...fixedStageKeys,
+      ])],
       jsScope: ui.jsScopes.find((input) => input.checked)?.value ?? "none",
     };
   }
 
   function updateExportControls() {
-    const stageInputs = [...ui.stageList.querySelectorAll('input[type="checkbox"]')];
+    const stageInputs = [...ui.stageChoices.querySelectorAll('input[type="checkbox"]')];
     const selectedCount = stageInputs.filter((input) => input.checked).length;
     const hasData = ui.includeCatalog.checked || ui.includeOwned.checked || selectedCount > 0
+      || ui.fixedStages.value.trim() !== ""
       || ui.jsScopes.some((input) => input.checked && input.value !== "none");
-    if (stageInputs.length) {
-      const snapshotHint = ui.includeCatalog.checked
-        ? "所选 JSON 的 snapshot 将包含这些关卡。"
-        : "若需要模拟器快照，还要勾选图鉴基础数据。";
-      ui.stageSummary.textContent = `已选 ${selectedCount}/${stageInputs.length} 个关卡，每关包含完整波次。${snapshotHint}`;
-    } else {
-      ui.stageSummary.textContent = "正在读取页面关卡…";
-    }
     if (busy) return;
     ui.copyExport.disabled = !hasData;
     ui.downloadExport.disabled = !hasData;
@@ -564,14 +556,21 @@
       || selection.jsScope !== "none";
     if (!hasData) throw new Error("至少选择一项导出内容。");
     setExportStatus("正在读取所选数据和页面关卡…");
-    const sources = await loadStageSources({ includeState: needsState });
-    const { catalog, state, raid, raidError } = sources;
-    const entries = buildStageEntries(catalog, sources.endless, raid);
+    const sources = await loadStageSources({ requireState: needsState });
+    const { catalog, state, raid, raidError, stateError } = sources;
+    const entries = buildStageEntries(catalog, sources.endless, raid, state?.daily);
     stageOptions = { ...sources, entries };
     renderStageOptions(entries);
     const allowedKeys = new Set(entries.map((entry) => entry.key));
     const selectedStages = entries.filter((entry) => selection.stageKeys.includes(entry.key));
     const wantsRaid = selection.stageKeys.some((key) => key.startsWith("raid:"));
+    const wantsDaily = selection.stageKeys.some((key) => key.startsWith("daily:"));
+    if (wantsDaily && stateError) {
+      throw new Error(`所选每日任务关卡读取失败：${stateError.message}`);
+    }
+    if (wantsDaily && !selectedStages.some((entry) => entry.kind === "daily")) {
+      throw new Error("所选每日任务关卡已更新，请重新勾选。");
+    }
     if (wantsRaid && raidError) {
       throw new Error(`所选限时全服头目读取失败：${raidError.message}`);
     }
@@ -579,7 +578,7 @@
       throw new Error("所选限时全服头目已结束或当前不可用，请重新勾选。");
     }
     if (selection.stageKeys.some((key) => !allowedKeys.has(key))) {
-      throw new Error("所选关卡已不在当前页面数据中，请重新勾选。");
+      throw new Error("所选关卡已不在当前页面数据中，请检查固定关卡 id 或重新勾选活动关卡。");
     }
 
     const capturedAt = new Date().toISOString();
@@ -619,8 +618,11 @@
       ...(roster ? { roster } : {}),
       ...(client ? { client } : {}),
       privacy: {
-        excluded: ["uid", "cookies", "authorization", "cans", "clears", "stars", "pity", "draws", "attempts"],
-        note: "只包含本次勾选的数据；排除登录凭据、余额、通关/星级、抽卡和无尽次数。",
+        excluded: [
+          "uid", "cookies", "authorization", "cans", "clears", "stars", "pity",
+          "draws", "attempts", "dailyChosen", "dailyWon",
+        ],
+        note: "只包含本次勾选的数据；排除登录凭据、余额、通关/星级、每日任务选择/领奖状态、抽卡和无尽次数。",
       },
     };
     const summary = [];
@@ -1248,9 +1250,7 @@
       ? "当前已在战斗中，无法更改道具选择。"
       : lacking
         ? "库存不足，脚本会阻断开战；自动勾选也无法继续。"
-        : ui.autoItems.checked
-          ? "开始执行时会按策略自动勾选/取消。"
-          : "请先在准备界面手动勾选，或启用自动勾选。";
+        : "开始执行时会按策略自动勾选/取消。";
     ui.itemWarning.hidden = false;
     ui.itemWarning.textContent = `本策略要求消耗：${detail.join("、")}。${action}`;
   }
@@ -1306,7 +1306,7 @@
     }
 
     if (!ui.autoStart.checked) {
-      throw new Error("当前没有进行中的战斗。勾选“无战斗时由脚本点击开始战斗”，或先手动开始战斗。");
+      throw new Error("当前没有进行中的战斗。勾选“自动开始战斗”，或先手动开始战斗。");
     }
 
     if (!prep) throw new Error("没有找到可用的“出战”准备界面。请先打开策略对应的关卡准备界面。");
@@ -1316,10 +1316,8 @@
       setRunStatus(full.join("\n"), true);
       throw new Error(stageCheck.messages.join("\n"));
     }
-    if (ui.autoItems.checked) {
-      setRunStatus(`${validation.join("\n")}\n\n正在按策略勾选消耗品…`);
-      prep = await selectPreparationItems(strategy, prep);
-    }
+    setRunStatus(`${validation.join("\n")}\n\n正在按策略勾选消耗品…`);
+    prep = await selectPreparationItems(strategy, prep);
     updateItemWarning(strategy, prep);
     const preparation = validatePreparation(strategy, prep);
     const combined = [...validation, ...preparation];
