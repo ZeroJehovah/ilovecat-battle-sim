@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         喵喵的逆袭 · 数据导出与策略执行
 // @namespace    https://github.com/ZeroJehovah/ilovecat-battle-sim
-// @version      0.1.8
+// @version      0.1.9
 // @description  只读导出战斗数据与当前 JS，并按 JSON 策略操作战斗页面
 // @match        https://api.ilovecat520.me/*
 // @updateURL    https://raw.githubusercontent.com/ZeroJehovah/ilovecat-battle-sim/main/tools/ilovecat-workbench.user.js
@@ -15,7 +15,7 @@
 
   const STRATEGY_FORMAT = "ilovecat-battle-strategy";
   const EXPORT_FORMAT = "ilovecat-game-export";
-  const USERSCRIPT_VERSION = "0.1.8";
+  const USERSCRIPT_VERSION = "0.1.9";
   const STORAGE_KEY = "ilovecat-workbench-strategy";
   const ACTION_GAP_MS = 250;
   const LOOP_MS = 100;
@@ -1063,7 +1063,7 @@
     };
     ui.run.disabled = true;
     ui.validate.disabled = true;
-    executor.timer = setInterval(executeTick, LOOP_MS);
+    executor.timer = setTimeout(executeTick, 0);
     setRunStatus(`${combined.join("\n")}\n\n正在点击“开始战斗”…`);
     prep.startButton.click();
   }
@@ -1088,17 +1088,24 @@
     };
     ui.run.disabled = true;
     ui.validate.disabled = true;
-    executor.timer = setInterval(executeTick, LOOP_MS);
+    executor.timer = setTimeout(executeTick, 0);
     setRunStatus("运行中：等待战斗快照…");
   }
 
   function stopExecutor(message, updateStatus = true) {
-    if (executor?.timer) clearInterval(executor.timer);
+    if (executor?.timer) clearTimeout(executor.timer);
     if (executor) executor.stopped = true;
     executor = null;
     ui.run.disabled = false;
     ui.validate.disabled = false;
     if (message && updateStatus) setRunStatus(message);
+  }
+
+  function scheduleExecutorTick() {
+    if (!executor || executor.stopped) return;
+    const now = performance.now();
+    const delay = executor.nextActionAt > now ? executor.nextActionAt - now : LOOP_MS;
+    executor.timer = setTimeout(executeTick, Math.max(0, delay));
   }
 
   function executeTick() {
@@ -1162,6 +1169,8 @@
       updateRunningStatus(snapshot);
     } catch (error) {
       stopExecutor(`执行器错误：${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      scheduleExecutorTick();
     }
   }
 
