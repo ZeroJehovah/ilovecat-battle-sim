@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         喵喵的逆袭 · 数据导出与策略执行
 // @namespace    https://github.com/ZeroJehovah/ilovecat-battle-sim
-// @version      0.3.7
+// @version      0.3.8
 // @description  按范围只读导出战斗数据与 JS，并按 JSON 策略操作战斗页面；支持空闲自动倍速
 // @match        https://api.ilovecat520.me/*
 // @updateURL    https://raw.githubusercontent.com/ZeroJehovah/ilovecat-battle-sim/main/tools/ilovecat-workbench.user.js
@@ -15,7 +15,7 @@
 
   const STRATEGY_FORMAT = "ilovecat-battle-strategy";
   const EXPORT_FORMAT = "ilovecat-game-export";
-  const USERSCRIPT_VERSION = "0.3.7";
+  const USERSCRIPT_VERSION = "0.3.8";
   const STORAGE_KEY = "ilovecat-workbench-strategy";
   const ACTION_GAP_MS = 250;
   const LOOP_MS = 100;
@@ -117,35 +117,40 @@
           border-radius: 11px; background: #11161d;
         }
         .scope-card label.check {
-          min-height: 26px; margin: 0; padding: 3px 0;
-          font-size: 12px; line-height: 1.35;
+          min-height: 32px; margin: 0; padding: 0;
+          font-size: 12px; line-height: 18px;
         }
-        .scope-card label.radio { line-height: 1.4; }
+        .scope-card label.radio { line-height: 18px; }
+        .scope-card input[type="checkbox"],
+        .scope-card input[type="radio"] {
+          flex: 0 0 auto; width: 14px; height: 14px; margin: 0;
+          position: relative; top: -1px; accent-color: #d28a28;
+        }
         .stage-choices { display: flex; flex-direction: column; gap: 6px; margin: 0; }
         .stage-option, .daily-stage-row {
-          display: flex; align-items: center; gap: 7px; min-height: 26px; padding: 3px 0;
-          border-radius: 6px; font-size: 12px; line-height: 1.35;
+          display: flex; align-items: center; gap: 7px; min-height: 32px; padding: 0;
+          border-radius: 6px; font-size: 12px; line-height: 18px;
         }
         .stage-option { cursor: pointer; }
         .daily-stage-row { gap: 10px; white-space: nowrap; }
         .daily-difficulties { display: flex; align-items: center; gap: 8px; }
         .daily-difficulty {
-          display: flex; align-items: center; gap: 4px; cursor: pointer;
+          display: flex; align-items: center; gap: 4px; line-height: 18px; cursor: pointer;
         }
         .stage-kind { color: #f0b95c; font-weight: 700; }
         .fixed-stages {
-          display: flex; align-items: center; gap: 8px; min-height: 26px; margin: 0;
-          padding: 3px 0; color: #e7c98f; font-size: 12px; font-weight: 700; line-height: 1.35;
+          display: flex; align-items: center; gap: 8px; min-height: 32px; margin: 0;
+          padding: 0; color: #e7c98f; font-size: 12px; font-weight: 700; line-height: 18px;
         }
         .fixed-stage-input {
-          flex: 1; min-width: 0; height: 20px; border: 1px solid #4e5866; border-radius: 7px;
-          background: #0e1218; color: #e8eef6; padding: 1px 8px;
-          font-size: 12px; line-height: 16px;
+          flex: 1; min-width: 0; height: 30px; border: 1px solid #4e5866; border-radius: 7px;
+          background: #0e1218; color: #e8eef6; padding: 4px 8px;
+          font-size: 12px; line-height: 20px;
         }
         .js-scope-row {
-          display: flex; align-items: center; gap: 10px; min-height: 26px; margin: 0;
-          padding: 3px 0; color: #e7c98f; font-size: 12px; font-weight: 700;
-          line-height: 1.35; white-space: nowrap;
+          display: flex; align-items: center; gap: 10px; min-height: 32px; margin: 0;
+          padding: 0; color: #e7c98f; font-size: 12px; font-weight: 700;
+          line-height: 18px; white-space: nowrap;
         }
         .js-scope-row label.check {
           min-height: 0; margin: 0; padding: 0;
@@ -215,7 +220,7 @@
               <input class="fixed-stage-input" type="text" autocomplete="off" spellcheck="false" placeholder="关卡 id，例如 1,2,3" aria-label="固定关卡 id，例如 1,2,3" disabled>
             </label>
             <div class="js-scope-row" role="radiogroup" aria-label="JS 源码">
-              <label class="check"><input class="js-enable" type="checkbox"> JS源码：</label>
+              <label class="check"><input class="js-enable" type="checkbox"> JS源码</label>
               <label class="check radio"><input class="js-scope" type="radio" name="export-js-scope" value="battle" disabled> 战斗逻辑</label>
               <label class="check radio"><input class="js-scope" type="radio" name="export-js-scope" value="all" disabled> 全部</label>
             </div>

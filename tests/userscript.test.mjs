@@ -23,7 +23,7 @@ test("the userscript is syntactically valid and exposes both workflows", () => {
   assert.doesNotThrow(() => new Function(source));
   assert.match(source, /@match\s+https:\/\/api\.ilovecat520\.me\/\*/);
   assert.match(source, /@updateURL\s+https:\/\/raw\.githubusercontent\.com\/ZeroJehovah\/ilovecat-battle-sim\/main\/tools\/ilovecat-workbench\.user\.js/);
-  assert.match(source, /USERSCRIPT_VERSION = "0\.3\.7"/);
+  assert.match(source, /USERSCRIPT_VERSION = "0\.3\.8"/);
   assert.match(source, /<div class="title">喵喵的逆袭工具 <span class="version">v\$\{USERSCRIPT_VERSION\}<\/span><\/div>/);
   assert.match(source, /ilovecat-game-export/);
   assert.match(source, /ilovecat-battle-strategy/);
@@ -83,7 +83,9 @@ test("the userscript is syntactically valid and exposes both workflows", () => {
   assert.doesNotMatch(source, /include-team|include-inventory/);
   assert.match(source, /stage-choices/);
   assert.match(source, /\.scope-card \{[\s\S]*?display: flex; flex-direction: column; gap: 6px;/);
-  assert.match(source, /\.stage-option, \.daily-stage-row \{[\s\S]*?min-height: 26px; padding: 3px 0;/);
+  assert.match(source, /\.stage-option, \.daily-stage-row \{[\s\S]*?min-height: 32px; padding: 0;/);
+  assert.match(source, /\.scope-card input\[type="checkbox"\],\s*\.scope-card input\[type="radio"\] \{[\s\S]*?margin: 0;[\s\S]*?top: -1px;/);
+  assert.match(source, /\.fixed-stage-input \{[\s\S]*?height: 30px;/);
   assert.match(source, /当前无尽/);
   assert.match(source, /每日任务/);
   assert.match(source, /限时活动/);
@@ -93,8 +95,9 @@ test("the userscript is syntactically valid and exposes both workflows", () => {
   assert.match(source, /fixed-stage-input/);
   assert.match(source, /placeholder="关卡 id，例如 1,2,3"/);
   assert.match(source, /js-enable/);
-  assert.match(source, /JS源码：/);
-  assert.match(source, /JS源码：<\/label>[\s\S]*?value="battle" disabled> 战斗逻辑[\s\S]*?value="all" disabled> 全部/);
+  assert.match(source, /JS源码<\/label>/);
+  assert.doesNotMatch(source, /JS源码：/);
+  assert.match(source, /JS源码<\/label>[\s\S]*?value="battle" disabled> 战斗逻辑[\s\S]*?value="all" disabled> 全部/);
   assert.doesNotMatch(source, /value="none"/);
   assert.doesNotMatch(source, /include-catalog" type="checkbox" checked/);
   assert.match(source, /ui\.fixedStages\.disabled = !ui\.fixedStageEnable\.checked/);
