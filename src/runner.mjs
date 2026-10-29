@@ -50,6 +50,11 @@ export class AutoPolicy {
     this.automatic = options.automatic !== false;
     this.actions = [...(options.actions ?? [])].sort((a, b) => Number(a.at) - Number(b.at));
     this.nextAction = 0;
+    this.actionGap = Number(options.actionGap ?? 0);
+    if (!Number.isFinite(this.actionGap) || this.actionGap < 0) {
+      throw new Error("actionGap must be a non-negative number of seconds");
+    }
+    this.nextActAt = 0;
 
     if (!Array.isArray(this.deploySequence) || this.deploySequence.some((id) => typeof id !== "string")) {
       throw new Error("deploySequence must be an array of cat ids");
@@ -179,7 +184,9 @@ export function simulate({
   const hardStop = maxTime == null ? selectedStage.time_limit ?? 1200 : Number(maxTime);
 
   while (engine.result === "playing" && engine.time < hardStop) {
-    controller.act(engine);
+    if (engine.time + 1e-9 >= controller.nextActAt) {
+      if (controller.act(engine)) controller.nextActAt = engine.time + controller.actionGap;
+    }
     engine.step();
   }
 

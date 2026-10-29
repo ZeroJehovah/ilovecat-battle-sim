@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         喵喵的逆袭 · 数据导出与策略执行
 // @namespace    https://github.com/ZeroJehovah/ilovecat-battle-sim
-// @version      0.1.7
+// @version      0.1.8
 // @description  只读导出战斗数据与当前 JS，并按 JSON 策略操作战斗页面
 // @match        https://api.ilovecat520.me/*
 // @updateURL    https://raw.githubusercontent.com/ZeroJehovah/ilovecat-battle-sim/main/tools/ilovecat-workbench.user.js
@@ -15,7 +15,7 @@
 
   const STRATEGY_FORMAT = "ilovecat-battle-strategy";
   const EXPORT_FORMAT = "ilovecat-game-export";
-  const USERSCRIPT_VERSION = "0.1.7";
+  const USERSCRIPT_VERSION = "0.1.8";
   const STORAGE_KEY = "ilovecat-workbench-strategy";
   const ACTION_GAP_MS = 250;
   const LOOP_MS = 100;
@@ -541,6 +541,9 @@
     policy.timelineTolerance = policy.timelineTolerance == null
       ? 0.25
       : finiteNumber(policy.timelineTolerance, "policy.timelineTolerance");
+    policy.actionGap = policy.actionGap == null
+      ? ACTION_GAP_MS / 1000
+      : finiteNumber(policy.actionGap, "policy.actionGap");
     policy.openers = stringArray(policy.openers ?? [], "policy.openers");
     policy.priority = stringArray(policy.priority ?? [], "policy.priority");
     policy.fallbackPriority = stringArray(policy.fallbackPriority ?? [], "policy.fallbackPriority");
@@ -683,6 +686,9 @@
     const nameMap = names ?? new Map((runtime.context?.team ?? []).map((entry) => [entry.id, entry.name]));
     const describe = (id) => `${id} ${nameMap.get(id) || ""}`.trim();
     messages.push(...strategyRosterLines(strategy, nameMap));
+    if (Math.abs(Number(strategy.policy?.actionGap ?? ACTION_GAP_MS / 1000) - ACTION_GAP_MS / 1000) > 1e-9) {
+      messages.push(`警告：策略 actionGap=${strategy.policy.actionGap}s，执行器固定 ${ACTION_GAP_MS}ms，节奏会不一致。`);
+    }
     let hasError = false;
     if (!runtime.context) {
       messages.push("提示：当前没有进行中的战斗；请先配置队伍、道具并开始战斗。");
@@ -875,7 +881,7 @@
         }
         const onSecondPage = expectedIds.filter((id) => actualIds.indexOf(id) >= 5);
         if (onSecondPage.length) {
-          messages.push(`提示：${onSecondPage.map((id) => `${id} ${nameOf(id)}`).join("、")} 在第 2 页；执行器需要翻页，会增加真实操作时间。`);
+          messages.push(`提示：${onSecondPage.map((id) => `${id} ${nameOf(id)}`).join("、")} 在第 2 页；执行器会直接按 6–0 部署，不切换页面。`);
         }
         const extras = actualIds.filter((id) => !expectedIds.includes(id));
         if (extras.length) {
@@ -1254,23 +1260,42 @@
     if (snapshot.cats >= 20) return false;
     if ((snapshot.cooldowns?.[slot] ?? 0) > 0) return false;
     if (snapshot.money < entry.cost) return false;
-    return clickCardForSlot(slot, context);
+    return pressDeployKey(slot, context);
   }
 
   function clickCardForId(id, context) {
     const slot = context.team.findIndex((entry) => entry.id === id);
     if (slot < 0) throw new Error(`当前队伍没有 ${id}`);
-    return clickCardForSlot(slot, context);
+    return pressDeployKey(slot, context);
   }
 
-  function clickCardForSlot(slot, context) {
+  function deployKeyForSlot(slot) {
+    return slot === 9 ? "0" : String(slot + 1);
+  }
+
+  function pressDeployKey(slot, context) {
     const pageButton = findPageButton();
-    const targetPage = Math.floor(slot / 5);
-    const currentPage = readPage(pageButton);
-    if (currentPage != null && currentPage !== targetPage) {
-      pageButton?.click();
-      return "page";
+    if (slot < 5) {
+      const currentPage = pageButton ? readPage(pageButton) : 0;
+      if (currentPage == null) return clickVisibleCard(slot, context);
+      if (currentPage !== 0) {
+        pageButton.click();
+        return "page";
+      }
     }
+    // Keys 1-5 deploy the current page; 6-9 and 0 deploy absolute slots 5-9,
+    // so back-page units never require switching pages.
+    const key = deployKeyForSlot(slot);
+    window.dispatchEvent(new KeyboardEvent("keydown", {
+      key,
+      code: `Digit${key}`,
+      bubbles: true,
+      cancelable: true,
+    }));
+    return true;
+  }
+
+  function clickVisibleCard(slot, context) {
     const button = [...document.querySelectorAll("button[title]")].find((candidate) => {
       const match = candidate.title.match(/\((\d+)\)\s*$/);
       return match && Number(match[1]) === slot + 1 && candidate.title.includes(context.team[slot].name);

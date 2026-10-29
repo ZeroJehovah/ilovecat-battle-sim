@@ -209,6 +209,35 @@ test("deploySequence may fire a charged cannon while saving for the next unit", 
   assert.equal(engine.actions.length, 1);
 });
 
+test("actionGap enforces the real page-action interval in simulation", () => {
+  const result = simulate({
+    snapshot,
+    team: [
+      { id: "c1", level: 1 },
+      { id: "c6", level: 1 },
+      { id: "c2", level: 1 },
+    ],
+    stageId: 9101,
+    maxTime: 3,
+    seed: 1,
+    recordActions: true,
+    policy: {
+      walletTarget: 1,
+      deploySequence: ["c1", "c6", "c2", "c1", "c6", "c2"],
+      priority: ["c1", "c6", "c2"],
+      targetCounts: { c1: 2, c6: 2, c2: 2 },
+      actionGap: 0.25,
+    },
+  });
+  const deploys = result.actionLog
+    .filter((action) => action.type === "deploy")
+    .map((action) => action.at);
+  assert.ok(deploys.length >= 3);
+  for (let index = 1; index < deploys.length; index++) {
+    assert.ok(deploys[index] - deploys[index - 1] >= 0.25 - 1e-9);
+  }
+});
+
 test("world-boss runs report direct boss damage and aggregate its distribution", () => {
   const worldBoss = {
     id: 9001,

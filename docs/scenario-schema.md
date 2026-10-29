@@ -47,6 +47,7 @@
 
 The action loop runs before each 0.02-second battle step and performs at most one world action per step.
 
+- `actionGap`: minimum simulated seconds between successful world actions (default `0`). Use `0.25` to match the browser executor's 250 ms real-time action throttle. With the 0.02-second step the effective interval becomes the next step at or after the gap (0.26 seconds for `0.25`).
 - `openers`: cat ids deployed once before the economy phase. Deployment can fail if money or cooldown is insufficient and is retried later.
 - `deploySequence`: optional ordered cat-id list deployed after the wallet target is reached. Repeated ids are allowed. The next entry is strict: if it is unaffordable, cooling down, or unavailable, the policy waits for that exact cat and does not fall through to `priority` or `fallbackPriority` until the sequence is complete.
 - `autoCannon`: with a deploy sequence, a charged cannon may still fire while the policy is waiting for the next fixed unit; the cannon does not spend money or advance the sequence.
