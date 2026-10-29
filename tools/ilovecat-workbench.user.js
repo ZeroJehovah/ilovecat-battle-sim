@@ -1,12 +1,15 @@
 // ==UserScript==
 // @name         喵喵的逆袭 · 数据导出与策略执行
 // @namespace    https://github.com/ZeroJehovah/ilovecat-battle-sim
-// @version      0.3.10
-// @description  按范围只读导出战斗数据与 JS，并按 JSON 策略操作战斗页面；支持空闲自动倍速
+// @version      0.4.0
+// @description  按范围只读导出战斗数据与 JS，并从在线索引或本地文件选择策略操作战斗页面
 // @match        https://api.ilovecat520.me/*
 // @updateURL    https://raw.githubusercontent.com/ZeroJehovah/ilovecat-battle-sim/main/tools/ilovecat-workbench.user.js
 // @downloadURL  https://raw.githubusercontent.com/ZeroJehovah/ilovecat-battle-sim/main/tools/ilovecat-workbench.user.js
-// @grant        none
+// @grant        GM_xmlhttpRequest
+// @grant        unsafeWindow
+// @connect      github.com
+// @connect      raw.githubusercontent.com
 // @run-at       document-idle
 // ==/UserScript==
 
@@ -15,8 +18,9 @@
 
   const STRATEGY_FORMAT = "ilovecat-battle-strategy";
   const EXPORT_FORMAT = "ilovecat-game-export";
-  const USERSCRIPT_VERSION = "0.3.10";
-  const STORAGE_KEY = "ilovecat-workbench-strategy";
+  const USERSCRIPT_VERSION = "0.4.0";
+  const STRATEGY_INDEX_URL = "https://github.com/ZeroJehovah/ilovecat-battle-sim-docs/raw/main/strategies/index.json";
+  const STRATEGY_INDEX_TTL_MS = 5 * 60 * 1000;
   const ACTION_GAP_MS = 250;
   const LOOP_MS = 100;
   const BATTLE_START_TIMEOUT_MS = 20000;
@@ -34,24 +38,29 @@
     rally: "全軍振奮",
   };
 
+  const pageWindow = typeof unsafeWindow === "undefined" ? window : unsafeWindow;
+  const pageDocument = pageWindow.document;
   let executor = null;
   let busy = false;
   let speedRestoreToken = 0;
   let stageOptions = null;
   let stageOptionsPromise = null;
+  let activeStrategyText = "";
+  let selectedOnlineStrategyId = "";
+  let onlineStrategyIndex = null;
+  let onlineStrategyIndexPromise = null;
+  let onlineStrategyIndexLoadedAt = 0;
 
-  window.__ilovecatWorkbenchV1?.destroy?.();
+  pageWindow.__ilovecatWorkbenchV1?.destroy?.();
 
   const ui = createUi();
-  const previousStrategy = readStorage();
-  if (previousStrategy) ui.strategy.value = previousStrategy;
   wireUi();
-  window.__ilovecatWorkbenchV1 = {
+  pageWindow.__ilovecatWorkbenchV1 = {
     destroy() {
       stopExecutor("", false);
       speedRestoreToken++;
       ui.host.remove();
-      delete window.__ilovecatWorkbenchV1;
+      delete pageWindow.__ilovecatWorkbenchV1;
     },
   };
 
@@ -108,8 +117,57 @@
           border: 1px solid #4e5866; background: #0e1218; color: #e8eef6;
           padding: 10px; font: 12px/1.5 ui-monospace, SFMono-Regular, Consolas, monospace;
         }
-        [data-view="execute"] > textarea { height: 128px; min-height: 128px; resize: none; }
         input[type="file"][hidden] { display: none !important; }
+        .strategy-source {
+          display: flex; flex-direction: column; gap: 8px; margin: 10px 0;
+          padding: 10px; border: 1px solid #3e4857; border-radius: 11px;
+          background: #11161d;
+        }
+        .strategy-source-head {
+          display: flex; align-items: center; justify-content: space-between; gap: 10px;
+        }
+        .strategy-source-title { color: #f0b95c; font-size: 13px; font-weight: 700; }
+        .refresh-strategies {
+          border: 1px solid #5e513d; border-radius: 8px; background: #282f3a;
+          color: #f7ead0; padding: 4px 8px; cursor: pointer; font-size: 11px;
+        }
+        .online-strategies {
+          display: flex; flex-direction: column; gap: 7px; max-height: 250px;
+          overflow: auto; padding-right: 2px;
+        }
+        .online-strategy {
+          width: 100%; display: flex; flex-direction: column; gap: 5px;
+          padding: 9px 10px; border: 1px solid #3e4857; border-radius: 9px;
+          background: #171e27; color: #f7ead0; text-align: left; cursor: pointer;
+        }
+        .online-strategy:hover { border-color: #8b744e; background: #1c2530; }
+        .online-strategy.selected {
+          border-color: #f0b95c; box-shadow: inset 3px 0 0 #d28a28;
+          background: #24251f;
+        }
+        .online-strategy-title-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+        .online-strategy-title { font-size: 13px; font-weight: 700; }
+        .online-strategy-tag {
+          padding: 1px 6px; border: 1px solid #6d5c3e; border-radius: 999px;
+          color: #e7c98f; font-size: 10px; line-height: 16px;
+        }
+        .online-strategy-meta { color: #b9ad98; font-size: 11px; line-height: 1.45; }
+        .online-strategy-description { color: #d8cdb9; font-size: 11px; line-height: 1.55; }
+        .online-strategy-empty {
+          padding: 9px 10px; border: 1px dashed #3e4857; border-radius: 9px;
+          color: #b9ad98; font-size: 11px; line-height: 1.55;
+        }
+        .local-strategy { display: flex; align-items: center; gap: 8px; min-height: 30px; }
+        .local-strategy .load-strategy {
+          flex: 0 0 auto; border: 1px solid #5e513d; border-radius: 9px;
+          background: #282f3a; color: #f7ead0; padding: 6px 9px; cursor: pointer;
+        }
+        .strategy-origin {
+          min-width: 0; color: #e7c98f; font-size: 11px; line-height: 1.4;
+          overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+        .online-index-status { min-height: 18px; }
+        .online-index-status.error { color: #ffaaa4; }
         .warning { color: #f4ca7c; }
         .scope-card {
           display: flex; flex-direction: column; gap: 6px;
@@ -239,25 +297,37 @@
           <pre class="status export-status">尚未读取。</pre>
         </div>
         <div class="view" data-view="execute" hidden>
-          <textarea spellcheck="false" placeholder="粘贴 ilovecat-battle-strategy JSON"></textarea>
           <input class="strategy-file" type="file" accept=".json,application/json" hidden>
+          <div class="strategy-source">
+            <div class="strategy-source-head">
+              <span class="strategy-source-title">在线策略</span>
+              <button class="refresh-strategies" type="button">刷新</button>
+            </div>
+            <div class="online-strategies" role="listbox" aria-label="在线策略列表">
+              <div class="online-strategy-empty">打开此页后自动加载，请稍候。</div>
+            </div>
+            <div class="online-index-status muted" aria-live="polite">尚未加载在线策略。</div>
+            <div class="local-strategy">
+              <button class="load-strategy" type="button">选择本地 JSON</button>
+              <span class="strategy-origin">未选择策略</span>
+            </div>
+          </div>
           <div class="execute-options">
             <label class="check warning"><input class="auto-start" type="checkbox"> 自动开始战斗</label>
             <label class="check"><input class="auto-speed" type="checkbox"> 自动倍速</label>
           </div>
           <p class="item-warning" hidden></p>
           <div class="actions">
-            <button class="load-strategy">导入 JSON 文件</button>
-            <button class="validate">校验</button>
-            <button class="primary run">开始执行</button>
-            <button class="danger stop">停止</button>
+            <button class="validate" type="button">校验</button>
+            <button class="primary run" type="button">开始执行</button>
+            <button class="danger stop" type="button">停止</button>
           </div>
           <div class="strategy-summary" aria-label="策略信息">
             <div class="strategy-summary-row"><span class="strategy-summary-label">策略名称：</span><span class="strategy-summary-name strategy-summary-value"></span></div>
             <div class="strategy-summary-row"><span class="strategy-summary-label">适用关卡：</span><span class="strategy-summary-stage strategy-summary-value"></span></div>
             <div class="strategy-summary-row"><span class="strategy-summary-label">策略配队：</span><span class="strategy-summary-team strategy-summary-value"></span></div>
           </div>
-          <div class="status run-status" aria-live="polite">尚未校验。</div>
+          <div class="status run-status" aria-live="polite">请先选择在线策略或本地 JSON 文件。</div>
         </div>
       </section>`;
     return {
@@ -279,8 +349,11 @@
       copyFallback: root.querySelector(".copy-fallback"),
       copyFallbackText: root.querySelector(".copy-fallback textarea"),
       exportStatus: root.querySelector(".export-status"),
-      strategy: root.querySelector('[data-view="execute"] textarea'),
       strategyFile: root.querySelector(".strategy-file"),
+      onlineStrategies: root.querySelector(".online-strategies"),
+      onlineIndexStatus: root.querySelector(".online-index-status"),
+      refreshStrategies: root.querySelector(".refresh-strategies"),
+      strategyOrigin: root.querySelector(".strategy-origin"),
       autoStart: root.querySelector(".auto-start"),
       autoSpeed: root.querySelector(".auto-speed"),
       itemWarning: root.querySelector(".item-warning"),
@@ -298,8 +371,11 @@
   function wireUi() {
     ui.launcher.addEventListener("click", () => {
       ui.panel.hidden = !ui.panel.hidden;
-      if (!ui.panel.hidden && !ui.views.find((view) => view.dataset.view === "export").hidden) {
+      if (ui.panel.hidden) return;
+      if (!ui.views.find((view) => view.dataset.view === "export").hidden) {
         ensureStageOptions().catch((error) => setExportStatus(error.message, true));
+      } else {
+        ensureOnlineStrategies().catch(() => {});
       }
     });
     ui.close.addEventListener("click", () => {
@@ -374,22 +450,26 @@
       updateExportControls();
     });
     ui.validate.addEventListener("click", () => runBusy(() => validateFromUi()));
-    ui.strategy.addEventListener("input", () => {
-      if (busy || executor) return;
-      clearStrategySummary();
-      setRunStatus("尚未校验。");
-    });
     ui.loadStrategy.addEventListener("click", () => ui.strategyFile.click());
     ui.strategyFile.addEventListener("change", () => runBusy(async () => {
       const file = ui.strategyFile.files?.[0];
       if (!file) return;
-      const text = await file.text();
-      ui.strategy.value = text;
-      saveStorage(text);
-      clearStrategySummary();
-      setRunStatus(`已载入 ${file.name}（${text.length} 个字符）。请点击“校验”。`);
       ui.strategyFile.value = "";
+      if (file.size > 2 * 1024 * 1024) throw new Error("策略文件超过 2 MiB，已拒绝读取。");
+      const text = await file.text();
+      parseStrategy(text);
+      setActiveStrategy(text, file.name);
+      setRunStatus(`已载入本地文件 ${file.name}，正在校验。`);
+      await validateFromUi();
     }));
+    ui.refreshStrategies.addEventListener("click", () => runBusy(async () => {
+      await ensureOnlineStrategies(true);
+    }));
+    ui.onlineStrategies.addEventListener("click", (event) => {
+      const button = event.target.closest(".online-strategy");
+      if (!button || !button.dataset.strategyId || busy || executor) return;
+      runBusy(() => selectOnlineStrategy(button.dataset.strategyId));
+    });
     ui.run.addEventListener("click", () => runBusy(() => startFromUi()));
     ui.stop.addEventListener("click", () => stopExecutor("用户停止。"));
     ui.autoSpeed.addEventListener("change", () => {
@@ -400,12 +480,14 @@
     });
     syncExportControlState();
     updateExportControls();
+    syncStrategyControls();
   }
 
   function showTab(name) {
     for (const tab of ui.tabs) tab.classList.toggle("active", tab.dataset.tab === name);
     for (const view of ui.views) view.hidden = view.dataset.view !== name;
     if (name === "export") ensureStageOptions().catch((error) => setExportStatus(error.message, true));
+    if (name === "execute") ensureOnlineStrategies().catch(() => {});
   }
 
   async function runBusy(task) {
@@ -413,6 +495,7 @@
     busy = true;
     ui.copyExport.disabled = true;
     ui.downloadExport.disabled = true;
+    syncStrategyControls();
     try {
       await task();
     } catch (error) {
@@ -424,6 +507,165 @@
       ui.copyExport.disabled = false;
       ui.downloadExport.disabled = false;
       updateExportControls();
+      syncStrategyControls();
+    }
+  }
+
+  function syncStrategyControls() {
+    const locked = busy || Boolean(executor);
+    ui.loadStrategy.disabled = locked;
+    ui.strategyFile.disabled = locked;
+    ui.refreshStrategies.disabled = locked;
+    for (const button of ui.onlineStrategies.querySelectorAll("button")) button.disabled = locked;
+    ui.validate.disabled = locked || !activeStrategyText;
+  }
+
+  function setActiveStrategy(text, label, onlineId = "") {
+    activeStrategyText = text;
+    selectedOnlineStrategyId = onlineId;
+    ui.strategyOrigin.textContent = `已选择：${label}`;
+    ui.strategyOrigin.title = label;
+    for (const button of ui.onlineStrategies.querySelectorAll(".online-strategy")) {
+      const selected = Boolean(onlineId) && button.dataset.strategyId === onlineId;
+      button.classList.toggle("selected", selected);
+      button.setAttribute("aria-selected", String(selected));
+    }
+    clearStrategySummary();
+    syncStrategyControls();
+  }
+
+  function setOnlineStatus(message, error = false) {
+    ui.onlineIndexStatus.textContent = message;
+    ui.onlineIndexStatus.classList.toggle("error", error);
+  }
+
+  function onlineEmpty(message) {
+    const empty = document.createElement("div");
+    empty.className = "online-strategy-empty";
+    empty.textContent = message;
+    return empty;
+  }
+
+  function renderOnlineStrategies() {
+    if (!onlineStrategyIndex) return;
+    const fragment = document.createDocumentFragment();
+    for (const entry of onlineStrategyIndex.strategies) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "online-strategy";
+      button.dataset.strategyId = entry.id;
+      button.setAttribute("role", "option");
+      const selected = entry.id === selectedOnlineStrategyId;
+      button.classList.toggle("selected", selected);
+      button.setAttribute("aria-selected", String(selected));
+
+      const titleRow = document.createElement("span");
+      titleRow.className = "online-strategy-title-row";
+      const title = document.createElement("span");
+      title.className = "online-strategy-title";
+      title.textContent = entry.title;
+      titleRow.append(title);
+      for (const tagText of entry.tags) {
+        const tag = document.createElement("span");
+        tag.className = "online-strategy-tag";
+        tag.textContent = tagText;
+        titleRow.append(tag);
+      }
+
+      const stage = document.createElement("span");
+      stage.className = "online-strategy-meta";
+      stage.textContent = `关卡 ${entry.stage.name}（id ${entry.stage.id}）`;
+
+      const team = document.createElement("span");
+      team.className = "online-strategy-meta";
+      team.textContent = entry.team.map((cat) => `${cat.name} Lv.${cat.level}`).join("、");
+
+      const description = document.createElement("span");
+      description.className = "online-strategy-description";
+      description.textContent = entry.description;
+
+      button.append(titleRow, stage, team, description);
+      fragment.append(button);
+    }
+    if (!onlineStrategyIndex.strategies.length) {
+      fragment.append(onlineEmpty("索引中没有符合当前阵容等级的策略。"));
+    }
+    ui.onlineStrategies.replaceChildren(fragment);
+    const capturedAt = onlineStrategyIndex.roster.capturedAt.replace("T", " ").slice(0, 16);
+    setOnlineStatus(`已加载 ${onlineStrategyIndex.strategies.length} 个有效策略 · 等级基准 ${capturedAt}`);
+    syncStrategyControls();
+  }
+
+  async function ensureOnlineStrategies(force = false) {
+    if (onlineStrategyIndexPromise) return onlineStrategyIndexPromise;
+    const expired = onlineStrategyIndex && Date.now() - onlineStrategyIndexLoadedAt > STRATEGY_INDEX_TTL_MS;
+    force ||= expired;
+    if (!force && onlineStrategyIndex) return onlineStrategyIndex;
+    if (force && selectedOnlineStrategyId) {
+      selectedOnlineStrategyId = "";
+      activeStrategyText = "";
+      ui.strategyOrigin.textContent = "未选择策略";
+      ui.strategyOrigin.removeAttribute("title");
+      clearStrategySummary();
+      ui.itemWarning.hidden = true;
+      ui.itemWarning.textContent = "";
+      setRunStatus("正在刷新有效策略列表，请重新选择在线策略。");
+      syncStrategyControls();
+    }
+    if (!onlineStrategyIndex) {
+      ui.onlineStrategies.replaceChildren(onlineEmpty("正在读取在线策略索引…"));
+    }
+    setOnlineStatus(force ? "正在刷新在线策略索引…" : "正在读取在线策略索引…");
+    onlineStrategyIndexPromise = (async () => {
+      const text = await requestRemoteText(STRATEGY_INDEX_URL);
+      const index = parseStrategyIndex(text);
+      onlineStrategyIndex = index;
+      onlineStrategyIndexLoadedAt = Date.now();
+      if (selectedOnlineStrategyId && !index.strategies.some((entry) => entry.id === selectedOnlineStrategyId)) {
+        selectedOnlineStrategyId = "";
+        activeStrategyText = "";
+        ui.strategyOrigin.textContent = "未选择策略";
+        ui.strategyOrigin.removeAttribute("title");
+        clearStrategySummary();
+        ui.itemWarning.hidden = true;
+        ui.itemWarning.textContent = "";
+        setRunStatus("原在线策略已从有效索引移除，请重新选择策略。", true);
+      }
+      renderOnlineStrategies();
+      return index;
+    })();
+    try {
+      return await onlineStrategyIndexPromise;
+    } catch (error) {
+      if (!onlineStrategyIndex) {
+        ui.onlineStrategies.replaceChildren(onlineEmpty("在线索引读取失败。可检查 GitHub 登录态后刷新，或使用本地 JSON。"));
+      }
+      const message = error instanceof Error ? error.message : String(error);
+      setOnlineStatus(`在线策略加载失败：${message}`, true);
+      throw error;
+    } finally {
+      onlineStrategyIndexPromise = null;
+      syncStrategyControls();
+    }
+  }
+
+  async function selectOnlineStrategy(id) {
+    const index = onlineStrategyIndex ?? await ensureOnlineStrategies();
+    const entry = index.strategies.find((strategy) => strategy.id === id);
+    if (!entry) throw new Error("选中的在线策略已不在最新索引中，请刷新后重试。");
+    setOnlineStatus(`正在载入「${entry.title}」…`);
+    try {
+      const text = await requestRemoteText(entry.rawUrl);
+      const strategy = parseStrategy(text);
+      validateIndexedStrategy(index, entry, strategy);
+      setActiveStrategy(text, `在线 · ${entry.title}`, entry.id);
+      renderOnlineStrategies();
+      setOnlineStatus(`已选择「${entry.title}」。`);
+      await validateFromUi();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setOnlineStatus(`策略载入失败：${message}`, true);
+      throw error;
     }
   }
 
@@ -969,20 +1211,159 @@
     return `${(bytes / 1024 / 1024).toFixed(2)} MiB`;
   }
 
-  function readStorage() {
+  // testable:parseStrategyIndex
+  function parseStrategyIndex(rawText, rawRoot = "https://github.com/ZeroJehovah/ilovecat-battle-sim-docs/raw/main/strategies/") {
+    let value;
     try {
-      return localStorage.getItem(STORAGE_KEY) || "";
-    } catch {
-      return "";
+      value = JSON.parse(rawText);
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      throw new Error(`策略索引不是合法 JSON：${detail}`);
     }
+    if (!value || value.format !== "ilovecat-strategy-index" || value.version !== 1) {
+      throw new Error("策略索引格式必须是 ilovecat-strategy-index 且 version=1。");
+    }
+    if (!Number.isFinite(Date.parse(value.updatedAt))) throw new Error("策略索引 updatedAt 不是有效日期。");
+    if (!value.roster || !Number.isFinite(Date.parse(value.roster.capturedAt))) {
+      throw new Error("策略索引缺少有效的 roster.capturedAt。");
+    }
+    if (!value.roster.levels || typeof value.roster.levels !== "object" || Array.isArray(value.roster.levels)) {
+      throw new Error("策略索引 roster.levels 必须是对象。");
+    }
+    const levels = {};
+    for (const [id, level] of Object.entries(value.roster.levels)) {
+      if (!/^[a-z0-9]+$/.test(id) || !Number.isInteger(level) || level < 1 || level > 999) {
+        throw new Error(`策略索引 roster.levels.${id} 无效。`);
+      }
+      levels[id] = level;
+    }
+    if (!Array.isArray(value.strategies)) throw new Error("策略索引 strategies 必须是数组。");
+    const ids = new Set();
+    const files = new Set();
+    const strategies = value.strategies.map((entry, index) => {
+      const label = `strategies[${index}]`;
+      const id = String(entry?.id ?? "").trim();
+      if (!/^[a-z0-9][a-z0-9-]+$/.test(id)) throw new Error(`${label}.id 无效。`);
+      if (ids.has(id)) throw new Error(`策略索引 id 重复：${id}`);
+      ids.add(id);
+      const title = String(entry?.title ?? "").trim();
+      const description = String(entry?.description ?? "").trim();
+      if (!title || !description) throw new Error(`${label} 缺少标题或描述。`);
+      const file = String(entry?.file ?? "").trim();
+      if (!/^[A-Za-z0-9._-]+\.user-strategy\.json$/.test(file)) throw new Error(`${label}.file 无效。`);
+      if (files.has(file)) throw new Error(`策略索引文件重复：${file}`);
+      files.add(file);
+      const rawUrl = String(entry?.rawUrl ?? "");
+      if (rawUrl !== rawRoot + file) throw new Error(`${label}.rawUrl 必须指向私有策略库中的同名文件。`);
+      const stageId = Number(entry?.stage?.id);
+      const stageName = String(entry?.stage?.name ?? "").trim();
+      if (!Number.isInteger(stageId) || stageId < 1 || !stageName) throw new Error(`${label}.stage 无效。`);
+      if (!Array.isArray(entry?.team) || !entry.team.length) throw new Error(`${label}.team 不能为空。`);
+      const team = entry.team.map((cat, catIndex) => {
+        const catId = String(cat?.id ?? "").trim();
+        const name = String(cat?.name ?? "").trim();
+        const level = Number(cat?.level);
+        if (!/^[a-z0-9]+$/.test(catId) || !name || !Number.isInteger(level)) {
+          throw new Error(`${label}.team[${catIndex}] 无效。`);
+        }
+        if (levels[catId] !== level) {
+          throw new Error(`${label}.team 的 ${catId} 等级与当前阵容基准不一致。`);
+        }
+        return { id: catId, name, level };
+      });
+      if (new Set(team.map((cat) => cat.id)).size !== team.length) {
+        throw new Error(`${label}.team 包含重复猫咪。`);
+      }
+      const tags = Array.isArray(entry?.tags)
+        ? entry.tags.map((tag) => String(tag).trim()).filter(Boolean)
+        : [];
+      return { id, title, description, file, rawUrl, stage: { id: stageId, name: stageName }, team, tags };
+    });
+    return {
+      format: value.format,
+      version: value.version,
+      updatedAt: value.updatedAt,
+      roster: {
+        capturedAt: value.roster.capturedAt,
+        note: String(value.roster.note ?? ""),
+        levels,
+      },
+      strategies,
+    };
   }
+  // end testable:parseStrategyIndex
 
-  function saveStorage(value) {
-    try {
-      localStorage.setItem(STORAGE_KEY, value);
-    } catch {
-      // Storage is optional.
+  // testable:validateIndexedStrategy
+  function validateIndexedStrategy(index, entry, strategy) {
+    if (!strategy || strategy.format !== "ilovecat-battle-strategy" || strategy.version !== 1) {
+      throw new Error("在线策略格式无效。");
     }
+    if (Number(strategy.stageId) !== Number(entry.stage.id)) {
+      throw new Error(`在线策略关卡与索引不一致：${strategy.stageId} != ${entry.stage.id}。`);
+    }
+    const indexedTeam = new Map((entry.team ?? []).map((cat) => [String(cat.id), Number(cat.level)]));
+    const actualTeam = new Map((strategy.team ?? []).map((cat) => [String(cat.id), Number(cat.level)]));
+    const indexedIds = [...indexedTeam.keys()].sort();
+    const actualIds = [...actualTeam.keys()].sort();
+    if (indexedIds.join(",") !== actualIds.join(",") || actualTeam.size !== (strategy.team ?? []).length) {
+      throw new Error("在线策略配队与索引不一致。");
+    }
+    for (const [id, level] of indexedTeam) {
+      if (actualTeam.get(id) !== level) throw new Error(`在线策略的 ${id} 等级与索引不一致。`);
+      if (index.roster.levels[id] !== level) throw new Error(`在线策略的 ${id} 等级不符合当前阵容基准。`);
+    }
+    return true;
+  }
+  // end testable:validateIndexedStrategy
+
+  async function requestRemoteText(url) {
+    const gmRequest = typeof GM_xmlhttpRequest === "function"
+      ? GM_xmlhttpRequest
+      : globalThis.GM?.xmlHttpRequest?.bind(globalThis.GM);
+    if (typeof gmRequest === "function") {
+      return new Promise((resolve, reject) => {
+        gmRequest({
+          method: "GET",
+          url,
+          timeout: 20000,
+          anonymous: false,
+          headers: { Accept: "application/json", "Cache-Control": "no-cache" },
+          onload(response) {
+            if (response.status >= 200 && response.status < 300 && response.responseText) {
+              resolve(response.responseText);
+              return;
+            }
+            const hint = [401, 403, 404].includes(response.status)
+              ? "请确认当前浏览器已登录有权限访问策略库的 GitHub 账号。"
+              : "";
+            reject(new Error(`HTTP ${response.status || "未知"}。${hint}`));
+          },
+          onerror() {
+            reject(new Error("网络请求失败。请确认可以在当前浏览器访问 GitHub。"));
+          },
+          ontimeout() {
+            reject(new Error("读取在线策略超时，请稍后重试。"));
+          },
+        });
+      });
+    }
+    let response;
+    try {
+      response = await fetch(url, {
+        credentials: "include",
+        cache: "no-store",
+        headers: { Accept: "application/json" },
+      });
+    } catch {
+      throw new Error("浏览器阻止了跨域读取。请使用支持 GM_xmlhttpRequest 的篡改猴，或改用本地 JSON。");
+    }
+    if (!response.ok) {
+      const hint = [401, 403, 404].includes(response.status)
+        ? "请确认当前浏览器已登录有权限访问策略库的 GitHub 账号。"
+        : "";
+      throw new Error(`HTTP ${response.status}。${hint}`);
+    }
+    return response.text();
   }
 
   function parseStrategy(rawText) {
@@ -992,7 +1373,7 @@
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error);
       const hint = /unexpected end/i.test(detail)
-        ? `（当前输入 ${rawText.length} 个字符；请从第一个 { 复制到最后一个 }，或使用“导入 JSON 文件”）`
+        ? `（当前内容 ${rawText.length} 个字符；请重新选择完整的策略 JSON 文件或在线策略）`
         : "";
       throw new Error(`策略不是合法 JSON：${detail}${hint}`);
     }
@@ -1094,15 +1475,18 @@
 
   async function validateFromUi() {
     clearStrategySummary();
+    if (!activeStrategyText) {
+      setValidationResults([{ type: "error", text: "请先选择在线策略或本地 JSON 文件。" }]);
+      return null;
+    }
     let strategy;
     try {
-      strategy = parseStrategy(ui.strategy.value);
+      strategy = parseStrategy(activeStrategyText);
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error);
       setValidationResults([{ type: "error", text: `JSON 解析失败：${detail}` }]);
       return null;
     }
-    saveStorage(ui.strategy.value);
     setValidationResults([{ type: "success", text: "JSON 解析成功。" }]);
     const runtime = findBattleRuntime();
     const active = isActiveRuntime(runtime) ? runtime : { context: null, snapshot: null };
@@ -1365,7 +1749,7 @@
   function findPreparationRuntime(strategy) {
     const stageName = typeof strategy.stage?.name === "string" ? strategy.stage.name.trim() : "";
     if (!stageName && strategy.stageId == null) return null;
-    const dialogs = [...document.querySelectorAll('[role="dialog"], .snowapi-dialog-content')];
+    const dialogs = [...pageDocument.querySelectorAll('[role="dialog"], .snowapi-dialog-content')];
     const seen = new Set();
     let candidate = null;
     for (const dialog of dialogs) {
@@ -1622,8 +2006,8 @@
   }
 
   async function startFromUi() {
-    const strategy = parseStrategy(ui.strategy.value);
-    saveStorage(ui.strategy.value);
+    if (!activeStrategyText) throw new Error("请先选择在线策略或本地 JSON 文件。");
+    const strategy = parseStrategy(activeStrategyText);
     const runtime = findBattleRuntime();
     const active = isActiveRuntime(runtime) ? runtime : { context: null, snapshot: null };
     let prep = active.context ? null : findPreparationRuntime(strategy);
@@ -1735,6 +2119,7 @@
     executor = null;
     ui.run.disabled = false;
     ui.validate.disabled = false;
+    syncStrategyControls();
     if (raised) {
       setStoredBattleSpeed(1);
       restoreSpeedTo1(token);
@@ -1798,7 +2183,7 @@
         stopExecutor(`战斗已结束（${snapshot.result}），执行器停止。`);
         return;
       }
-      if (document.querySelector(".cat-battle-screen__overlay") || document.querySelector(".cat-battle-tip--modal")) {
+      if (pageDocument.querySelector(".cat-battle-screen__overlay") || pageDocument.querySelector(".cat-battle-tip--modal")) {
         setRunStatus("运行中：战斗暂停或提示层尚未关闭。");
         return;
       }
@@ -1960,7 +2345,7 @@
     // Keys 1-5 deploy the current page; 6-9 and 0 deploy absolute slots 5-9,
     // so back-page units never require switching pages.
     const key = deployKeyForSlot(slot);
-    window.dispatchEvent(new KeyboardEvent("keydown", {
+    pageWindow.dispatchEvent(new pageWindow.KeyboardEvent("keydown", {
       key,
       code: `Digit${key}`,
       bubbles: true,
@@ -1970,7 +2355,7 @@
   }
 
   function clickVisibleCard(slot, context) {
-    const button = [...document.querySelectorAll("button[title]")].find((candidate) => {
+    const button = [...pageDocument.querySelectorAll("button[title]")].find((candidate) => {
       const match = candidate.title.match(/\((\d+)\)\s*$/);
       return match && Number(match[1]) === slot + 1 && candidate.title.includes(context.team[slot].name);
     });
@@ -1980,7 +2365,7 @@
   }
 
   function clickWallet() {
-    const button = [...document.querySelectorAll("button[title]")].find((candidate) => {
+    const button = [...pageDocument.querySelectorAll("button[title]")].find((candidate) => {
       return /wallet/i.test(candidate.title) || candidate.title.includes("钱包") || candidate.title.includes("錢包");
     });
     if (!button) return false;
@@ -1989,7 +2374,7 @@
   }
 
   function clickCannon() {
-    const button = [...document.querySelectorAll("button[title]")].find((candidate) => {
+    const button = [...pageDocument.querySelectorAll("button[title]")].find((candidate) => {
       return /cannon/i.test(candidate.title) || candidate.title.includes("猫爪炮") || candidate.title.includes("貓爪炮");
     });
     if (!button) return false;
@@ -1998,7 +2383,7 @@
   }
 
   function findPageButton() {
-    return [...document.querySelectorAll("button")].find((button) => {
+    return [...pageDocument.querySelectorAll("button")].find((button) => {
       if (!/switch.*cats|切换到另外|切換到另外/i.test(button.title || "")) return false;
       return /(?:^|\n)\s*\d+\s*\/\s*\d+\s*(?:\n|$)/.test(button.innerText || "");
     });
@@ -2010,7 +2395,7 @@
   }
 
   function findBattleSpeedButton() {
-    return [...document.querySelectorAll("button")].find((candidate) => {
+    return [...pageDocument.querySelectorAll("button")].find((candidate) => {
       const label = `${candidate.title || ""} ${candidate.getAttribute("aria-label") || ""}`;
       return /战斗速度|戰鬥速度|Battle speed/i.test(label);
     }) || null;
@@ -2224,7 +2609,7 @@
   }
 
   function findBattleRuntime(expectedStageId = null, { requirePlaying = false } = {}) {
-    const screens = [...document.querySelectorAll(".cat-battle-screen")];
+    const screens = [...pageDocument.querySelectorAll(".cat-battle-screen")];
     for (const screen of screens) {
       const runtime = readBattleRuntime(screen);
       if (!runtime.context) continue;

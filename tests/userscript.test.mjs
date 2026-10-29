@@ -23,7 +23,10 @@ test("the userscript is syntactically valid and exposes both workflows", () => {
   assert.doesNotThrow(() => new Function(source));
   assert.match(source, /@match\s+https:\/\/api\.ilovecat520\.me\/\*/);
   assert.match(source, /@updateURL\s+https:\/\/raw\.githubusercontent\.com\/ZeroJehovah\/ilovecat-battle-sim\/main\/tools\/ilovecat-workbench\.user\.js/);
-  assert.match(source, /USERSCRIPT_VERSION = "0\.3\.10"/);
+  assert.match(source, /@grant\s+GM_xmlhttpRequest/);
+  assert.match(source, /@connect\s+github\.com/);
+  assert.match(source, /@connect\s+raw\.githubusercontent\.com/);
+  assert.match(source, /USERSCRIPT_VERSION = "0\.4\.0"/);
   assert.match(source, /<div class="title">喵喵的逆袭工具 <span class="version">v\$\{USERSCRIPT_VERSION\}<\/span><\/div>/);
   assert.match(source, /ilovecat-game-export/);
   assert.match(source, /ilovecat-battle-strategy/);
@@ -31,9 +34,18 @@ test("the userscript is syntactically valid and exposes both workflows", () => {
   assert.match(source, /fallbackPriority/);
   assert.match(source, /deploySequence/);
   assert.match(source, /sequenceIndex/);
-  assert.match(source, /导入 JSON 文件/);
+  assert.match(source, /选择本地 JSON/);
   assert.match(source, /strategyFile/);
-  assert.match(source, /strategy:\s*root\.querySelector\('\[data-view="execute"\] textarea'\)/);
+  assert.match(source, /online-strategies/);
+  assert.match(source, /ilovecat-battle-sim-docs\/raw\/main\/strategies\/index\.json/);
+  assert.match(source, /GM_xmlhttpRequest/);
+  const executeViewStart = source.indexOf('<div class="view" data-view="execute"');
+  const executeViewEnd = source.indexOf("</section>", executeViewStart);
+  assert.notEqual(executeViewStart, -1);
+  assert.notEqual(executeViewEnd, -1);
+  assert.doesNotMatch(source.slice(executeViewStart, executeViewEnd), /<textarea/);
+  assert.doesNotMatch(source, /粘贴 ilovecat-battle-strategy JSON/);
+  assert.doesNotMatch(source, /ui\.strategy\b/);
   assert.match(source, /strictTimeline/);
   assert.match(source, /scheduleMiss/);
   assert.match(source, /autoStart/);
@@ -74,7 +86,7 @@ test("the userscript is syntactically valid and exposes both workflows", () => {
   assert.match(source, /当前不会执行策略动作/);
   assert.match(source, /pressDeployKey/);
   assert.match(source, /deployKeyForSlot/);
-  assert.match(source, /new KeyboardEvent\("keydown"/);
+  assert.match(source, /new pageWindow\.KeyboardEvent\("keydown"/);
   assert.match(source, /return pressDeployKey\(slot, context\)/);
   assert.match(source, /policy\.actionGap/);
   assert.match(source, /节奏会不一致/);
@@ -112,7 +124,7 @@ test("the userscript is syntactically valid and exposes both workflows", () => {
   assert.match(source, /stageChoices\.querySelectorAll\("input\[data-stage-key\]:checked"\)/);
   assert.doesNotMatch(source, /!hadOptions|previouslyAll/);
   assert.doesNotMatch(source, /privacy:\s*\{/);
-  assert.match(source, /\[data-view="execute"\] > textarea \{ height: 128px; min-height: 128px; resize: none; \}/);
+  assert.doesNotMatch(source, /\[data-view="execute"\] > textarea/);
   assert.doesNotMatch(source, /stage-all|stage-none|stage-endless|stage-raid/);
   assert.doesNotMatch(source, /v\$\{USERSCRIPT_VERSION\} · 只读导出；执行器只操作页面按钮和游戏键盘事件/);
   assert.doesNotMatch(source, /复制和下载共用下面的范围/);
@@ -137,6 +149,61 @@ test("the userscript is syntactically valid and exposes both workflows", () => {
   assert.match(source, /复制所选 JSON/);
   assert.match(source, /下载所选 JSON/);
   assert.doesNotMatch(source, /download-snapshot/);
+});
+
+test("the online strategy index is strict and is cross-checked against each selected strategy", () => {
+  const parseStrategyIndex = markedFunction("parseStrategyIndex");
+  const validateIndexedStrategy = markedFunction("validateIndexedStrategy");
+  const file = "boss.user-strategy.json";
+  const rawRoot = "https://github.com/ZeroJehovah/ilovecat-battle-sim-docs/raw/main/strategies/";
+  const rawIndex = JSON.stringify({
+    format: "ilovecat-strategy-index",
+    version: 1,
+    updatedAt: "2026-10-29T23:05:13+08:00",
+    roster: {
+      capturedAt: "2026-10-29T00:15:17+08:00",
+      levels: { c7: 48, b4: 16 },
+    },
+    strategies: [{
+      id: "boss-fixed",
+      title: "Boss fixed",
+      description: "Use the fixed sequence.",
+      file,
+      rawUrl: rawRoot + file,
+      stage: { id: 9001, name: "Boss" },
+      team: [
+        { id: "c7", name: "虎斑", level: 48 },
+        { id: "b4", name: "布偶护士", level: 16 },
+      ],
+      tags: ["推荐"],
+    }],
+  });
+  const index = parseStrategyIndex(rawIndex, rawRoot);
+  assert.equal(index.strategies[0].rawUrl, rawRoot + file);
+  assert.deepEqual(index.strategies[0].team.map((cat) => cat.id), ["c7", "b4"]);
+
+  const strategy = {
+    format: "ilovecat-battle-strategy",
+    version: 1,
+    stageId: 9001,
+    team: [{ id: "c7", level: 48 }, { id: "b4", level: 16 }],
+  };
+  assert.equal(validateIndexedStrategy(index, index.strategies[0], strategy), true);
+  assert.throws(
+    () => validateIndexedStrategy(index, index.strategies[0], {
+      ...strategy,
+      team: [{ id: "c7", level: 48 }, { id: "b4", level: 17 }],
+    }),
+    /等级与索引不一致/,
+  );
+
+  const external = JSON.parse(rawIndex);
+  external.strategies[0].rawUrl = "https://example.test/boss.json";
+  assert.throws(() => parseStrategyIndex(JSON.stringify(external), rawRoot), /rawUrl 必须指向私有策略库/);
+
+  const stale = JSON.parse(rawIndex);
+  stale.strategies[0].team[0].level = 47;
+  assert.throws(() => parseStrategyIndex(JSON.stringify(stale), rawRoot), /等级与当前阵容基准不一致/);
 });
 
 test("fixed campaign stages accept a compact comma-separated id list", () => {
