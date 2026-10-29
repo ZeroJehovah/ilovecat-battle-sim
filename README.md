@@ -56,7 +56,8 @@ python3 tools/capture_live.py
 
 [`tools/ilovecat-workbench.user.js`](tools/ilovecat-workbench.user.js) 是可选篡改猴脚本，适合不便频繁启动 Camoufox 时手动导出当前数据。安装后打开游戏战斗页，页面右上角会出现“喵喵的逆袭工具”：
 
-- 一键复制或下载完整 JSON，其中含可直接替换 `data/snapshot.json` 的快照、当前队伍与等级、战斗道具数量，以及当前战斗 JS 和 SHA-256；
+- 复制或下载前按需勾选图鉴、队伍/等级、已拥有猫咪、战斗道具、页面上的每个普通关卡和当前无尽关卡；只有主动选择时才附加战斗 JS；
+- “下载模拟器快照”只生成所选图鉴和关卡的 `data/snapshot.json` 格式，不混入队伍、道具数量或 JS；
 - 将策略 JSON 粘贴到“执行策略”页后，执行器只在已经开始的战斗中通过页面按钮升级钱包、部署猫咪和发射猫爪炮；
 - 导出不会上传数据，也不会写入 UID、Cookie、令牌、罐罐余额、通关/星级或抽卡信息。
 

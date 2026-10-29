@@ -1,17 +1,29 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { selectStage } from "../src/runner.mjs";
 
 const source = await readFile(
   new URL("../tools/ilovecat-workbench.user.js", import.meta.url),
   "utf8",
 );
 
+function markedFunction(name) {
+  const startMarker = `// testable:${name}`;
+  const endMarker = `// end testable:${name}`;
+  const start = source.indexOf(startMarker);
+  const end = source.indexOf(endMarker, start);
+  assert.notEqual(start, -1, `missing ${startMarker}`);
+  assert.notEqual(end, -1, `missing ${endMarker}`);
+  const body = source.slice(start + startMarker.length, end).trim();
+  return new Function(`return (${body})`)();
+}
+
 test("the userscript is syntactically valid and exposes both workflows", () => {
   assert.doesNotThrow(() => new Function(source));
   assert.match(source, /@match\s+https:\/\/api\.ilovecat520\.me\/\*/);
   assert.match(source, /@updateURL\s+https:\/\/raw\.githubusercontent\.com\/ZeroJehovah\/ilovecat-battle-sim\/main\/tools\/ilovecat-workbench\.user\.js/);
-  assert.match(source, /USERSCRIPT_VERSION = "0\.2\.0"/);
+  assert.match(source, /USERSCRIPT_VERSION = "0\.3\.0"/);
   assert.match(source, /ilovecat-game-export/);
   assert.match(source, /ilovecat-battle-strategy/);
   assert.match(source, /battleBundles/);
@@ -54,6 +66,116 @@ test("the userscript is syntactically valid and exposes both workflows", () => {
   assert.match(source, /return pressDeployKey\(slot, context\)/);
   assert.match(source, /policy\.actionGap/);
   assert.match(source, /节奏会不一致/);
+  assert.match(source, /include-catalog/);
+  assert.match(source, /include-team/);
+  assert.match(source, /stage-list/);
+  assert.match(source, /仅当前无尽/);
+  assert.match(source, /js-scope/);
+  assert.match(source, /下载模拟器快照/);
+  assert.match(source, /复制所选 JSON/);
+  assert.match(source, /下载所选 JSON/);
+});
+
+test("the export scope lists every campaign stage plus the current endless stage", () => {
+  const buildStageEntries = markedFunction("buildStageEntries");
+  const catalog = {
+    stages: [
+      { id: 1, name: "one", waves: [{}, {}] },
+      { id: 2, name: "two", waves: [{}] },
+    ],
+  };
+  const endless = {
+    stage: { id: 9001, name: "endless", waves: [{}, {}, {}] },
+    season: "2026-10-26",
+    ends: "2026-11-01",
+  };
+  const entries = buildStageEntries(catalog, endless);
+  assert.deepEqual(entries.map((entry) => entry.key), ["endless:9001", "campaign:1", "campaign:2"]);
+  assert.equal(entries[0].endlessMeta.ends, "2026-11-01");
+  assert.equal(entries[2].stage.waves.length, 1);
+});
+
+test("selected export creates a simulator snapshot from only chosen stages", () => {
+  const buildStageEntries = markedFunction("buildStageEntries");
+  const buildSelectedSnapshot = markedFunction("buildSelectedSnapshot");
+  const catalog = {
+    cats: [{ id: "c1" }],
+    mice: [{ id: "m1" }],
+    items: [{ id: "rally" }],
+    rules: { max_level: 100 },
+    stages: [
+      { id: 1, name: "one", waves: [{}] },
+      { id: 2, name: "two", waves: [{}, {}] },
+    ],
+  };
+  const endless = {
+    stage: { id: 9001, name: "endless", waves: [{}, {}, {}] },
+    season: "2026-10-26",
+    ends: "2026-11-01",
+  };
+  const entries = buildStageEntries(catalog, endless);
+  const snapshot = buildSelectedSnapshot({
+    catalog,
+    selectedStages: [entries[0], entries[2]],
+    includeCatalog: true,
+    capturedAt: "2026-10-29T00:00:00.000Z",
+    source: "https://example.test/playground/battle",
+  });
+  assert.equal(snapshot.stage.id, 9001);
+  assert.deepEqual(snapshot.catalog.stages.map((stage) => stage.id), [2]);
+  assert.equal(snapshot.catalog.cats[0].id, "c1");
+  assert.equal(snapshot.endlessMeta.season, "2026-10-26");
+  assert.equal(selectStage(snapshot, 9001).id, 9001);
+  assert.equal(selectStage(snapshot, 2).id, 2);
+  assert.throws(() => selectStage(snapshot, 1), /stage 1 is not present/);
+
+  const campaignOnly = buildSelectedSnapshot({
+    catalog,
+    selectedStages: [entries[1]],
+    includeCatalog: true,
+    capturedAt: "2026-10-29T00:00:00.000Z",
+    source: "https://example.test/playground/battle",
+  });
+  assert.equal(campaignOnly.stage.id, 1);
+  assert.equal(campaignOnly.endlessMeta, undefined);
+  assert.equal(selectStage(campaignOnly, 1).id, 1);
+
+  const stagesOnly = buildSelectedSnapshot({
+    catalog,
+    selectedStages: [entries[1]],
+    includeCatalog: false,
+    capturedAt: "2026-10-29T00:00:00.000Z",
+    source: "https://example.test/playground/battle",
+  });
+  assert.equal(stagesOnly.catalog, undefined);
+  assert.equal(stagesOnly.stage.id, 1);
+});
+
+test("team, owned cats and inventory are omitted unless selected", () => {
+  const buildRoster = markedFunction("buildRoster");
+  const catalog = {
+    cats: [{ id: "c1", name: "cat" }],
+    items: [{ id: "rally" }],
+  };
+  const state = {
+    team: ["c1"],
+    units: [{ cat_id: "c1", owned: true, level: 12 }],
+    items: { rally: 3 },
+  };
+  assert.deepEqual(buildRoster(catalog, state, {
+    includeTeam: false,
+    includeOwned: false,
+    includeInventory: false,
+  }), {});
+  assert.deepEqual(buildRoster(catalog, state, {
+    includeTeam: true,
+    includeOwned: false,
+    includeInventory: true,
+  }), {
+    team: [{ slot: 0, id: "c1", name: "cat", level: 12 }],
+    scenarioTeam: [{ id: "c1", level: 12 }],
+    inventory: { rally: 3 },
+  });
 });
 
 test("the userscript does not submit data or export unrelated account state", () => {

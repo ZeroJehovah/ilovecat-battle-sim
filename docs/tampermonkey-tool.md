@@ -16,23 +16,35 @@ https://raw.githubusercontent.com/ZeroJehovah/ilovecat-battle-sim/main/tools/ilo
 
 也可以在“执行策略”页直接点击“导入 JSON 文件”，避免长策略经过剪贴板时只复制到部分内容。
 
-面板标题下方会显示当前版本号；脚本声明了 `@updateURL` 和 `@downloadURL`，Tampermonkey 可以直接检查 GitHub `main` 分支更新。`0.2.0` 支持准备界面校验、可选的自动开战、中文队伍预览、消耗品自动勾选、`6–0` 后台页键盘部署、按 250 ms 边界精确调度下一次动作，以及空闲自动倍速。
+面板标题下方会显示当前版本号；脚本声明了 `@updateURL` 和 `@downloadURL`，Tampermonkey 可以直接检查 GitHub `main` 分支更新。`0.3.0` 在原有策略执行能力上增加了按范围导出、逐关选择和可选 JS 正文；策略侧继续支持准备界面校验、可选的自动开战、中文队伍预览、消耗品自动勾选、`6–0` 后台页键盘部署、按 250 ms 边界精确调度下一次动作，以及空闲自动倍速。
 
 脚本匹配游戏域名下的页面，但只有点击猫咪按钮后才读取数据。导出请求与普通页面请求使用同一登录态；脚本不会展示、复制或上传 UID、Cookie 或请求头。
 
-## 导出内容
+## 按范围导出
 
-“完整 JSON”包含：
+“复制所选 JSON”和“下载所选 JSON”共用同一组勾选项。默认只导出图鉴基础数据、当前队伍/等级、当前道具数量，以及当前页面返回的全部关卡（每个普通关卡都可单独取消）；不默认导出任何 JS 正文。
 
-- `snapshot`：`schemaVersion`、采集时间、图鉴、当前无尽关卡和赛季结束时间，可直接作为模拟器的 `data/snapshot.json`；
-- `roster.team`：当前队伍槽位、猫 ID、名称和等级；
-- `roster.scenarioTeam`：可直接放进场景 JSON 的 `{ id, level }` 数组；
-- `roster.ownedUnits`：已拥有猫的 ID、名称和等级；
-- `roster.inventory`：五种战斗道具的当前数量；
-- `client.battleBundles`：识别出的当前战斗 JS、URL、字节数和 SHA-256；
-- `client.loadedScripts`：当前页面已加载的同源 JS 清单。
+可选范围：
 
-勾选“附带全部已加载 JS”时，`client.allScripts` 会额外保存所有同源脚本正文，文件通常有数 MiB。多数机制分析只需要 `battleBundles`。
+- `图鉴基础数据`：`catalog.cats`、`catalog.mice`、`catalog.items` 和 `catalog.rules`；
+- `当前队伍、槽位和等级`：导出 `roster.team` 与可直接放进场景 JSON 的 `roster.scenarioTeam`；
+- `已拥有猫咪的等级列表`：导出 `roster.ownedUnits`，属于账号相关数据，默认关闭；
+- `当前战斗道具数量`：导出 `roster.inventory`；
+- `页面关卡`：逐关勾选普通关卡或当前无尽关卡，每个选中关卡都保留完整 `waves`；还可以用“全选”“清空”“仅当前无尽”快速调整；
+- `战斗 JS`：默认“不导出”；“仅当前战斗 JS”会写入识别出的战斗 bundle 正文、大小、URL 和 SHA-256；“当前战斗 JS + 全部同源已加载 JS 正文”还会把当前页面加载过的每个同源 `.js` 文件完整正文写入 `client.allScripts`。
+
+“全部已加载 JS”不是运行日志，也不是只需计算的索引，而是浏览器当前已经请求过的同源 JavaScript 源码副本。它通常有数 MiB，只有需要离线审查其他页面模块或补丁时才选；单纯分析猫、鼠、关卡和波次时保持默认即可。
+
+导出结果的 `selection` 会记录本次勾选；`snapshot` 只包含所选图鉴字段和所选关卡，`roster`、`client` 则只在勾选相应范围时出现。
+
+## 模拟器快照
+
+“下载模拟器快照”会生成可放到模拟器 `data/snapshot.json` 的顶层结构，包括 `schemaVersion`、`capturedAt`、`source`、所选 `catalog` 字段和所选关卡；它不包含当前队伍、道具数量或 JS。
+
+- 必须勾选“图鉴基础数据”和至少 1 个关卡；
+- 选择普通关卡时，所选关卡进入 `catalog.stages`；如果没有选择当前无尽关卡，第一个所选普通关卡会同时写入 `stage`，让快照可以直接运行；
+- 选择当前无尽关卡时，它写入 `stage` 和 `endlessMeta`；同时选择的普通关卡进入 `catalog.stages`；
+- 快照只覆盖本次选择。未勾选的关卡不会出现在替换后的快照中，依赖这些关卡ID的场景也会明确报错。
 
 导出明确排除 UID、Cookie、授权头、罐罐余额、通关数、星级、抽卡统计、保底计数、无尽次数和最佳成绩。
 

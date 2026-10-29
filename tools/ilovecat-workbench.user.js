@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         喵喵的逆袭 · 数据导出与策略执行
 // @namespace    https://github.com/ZeroJehovah/ilovecat-battle-sim
-// @version      0.2.0
-// @description  只读导出战斗数据与当前 JS，并按 JSON 策略操作战斗页面；支持空闲自动倍速
+// @version      0.3.0
+// @description  按范围只读导出战斗数据与 JS，并按 JSON 策略操作战斗页面；支持空闲自动倍速
 // @match        https://api.ilovecat520.me/*
 // @updateURL    https://raw.githubusercontent.com/ZeroJehovah/ilovecat-battle-sim/main/tools/ilovecat-workbench.user.js
 // @downloadURL  https://raw.githubusercontent.com/ZeroJehovah/ilovecat-battle-sim/main/tools/ilovecat-workbench.user.js
@@ -15,7 +15,7 @@
 
   const STRATEGY_FORMAT = "ilovecat-battle-strategy";
   const EXPORT_FORMAT = "ilovecat-game-export";
-  const USERSCRIPT_VERSION = "0.2.0";
+  const USERSCRIPT_VERSION = "0.3.0";
   const STORAGE_KEY = "ilovecat-workbench-strategy";
   const ACTION_GAP_MS = 250;
   const LOOP_MS = 100;
@@ -37,6 +37,9 @@
   let executor = null;
   let busy = false;
   let speedRestoreToken = 0;
+  let stageOptions = null;
+  let stageOptionsPromise = null;
+  let previousStageKeys = [];
 
   window.__ilovecatWorkbenchV1?.destroy?.();
 
@@ -105,6 +108,37 @@
         }
         input[type="file"][hidden] { display: none !important; }
         .warning { color: #f4ca7c; }
+        .scope-card {
+          margin: 10px 0; padding: 10px; border: 1px solid #3e4857;
+          border-radius: 11px; background: #11161d;
+        }
+        .scope-title { margin-bottom: 4px; font-size: 13px; font-weight: 750; }
+        .scope-heading {
+          display: flex; align-items: center; justify-content: space-between; gap: 8px;
+          margin: 11px 0 2px; color: #e7c98f; font-size: 12px; font-weight: 700;
+        }
+        .scope-card label.check { margin: 6px 0; }
+        .scope-card label.radio { align-items: flex-start; line-height: 1.4; }
+        .scope-card input[type="radio"] { margin-top: 3px; }
+        .stage-tools { display: flex; flex-wrap: wrap; gap: 5px; }
+        .stage-tools button {
+          border: 1px solid #5e513d; border-radius: 7px; background: #252d37;
+          color: #f7ead0; padding: 3px 7px; font-size: 11px; cursor: pointer;
+        }
+        .stage-list {
+          max-height: 190px; overflow: auto; margin: 5px 0 2px; padding: 4px;
+          border: 1px solid #303946; border-radius: 8px; background: #0e1218;
+        }
+        .stage-option {
+          display: flex; align-items: flex-start; gap: 7px; padding: 5px 6px;
+          border-radius: 6px; font-size: 12px; line-height: 1.35; cursor: pointer;
+        }
+        .stage-option:hover { background: #1c232d; }
+        .stage-option input { margin-top: 2px; }
+        .stage-kind { color: #f0b95c; font-weight: 700; }
+        .stage-empty { padding: 8px; color: #b9ad98; font-size: 12px; }
+        .stage-summary { margin: 5px 0 0; }
+        .scope-note { margin: 7px 0 0; }
         .item-warning {
           margin: 8px 0 0; padding: 8px 10px; border-radius: 8px;
           border: 1px solid #8a4b2a; background: #2a1b14; color: #ffc38a;
@@ -129,13 +163,36 @@
           <button data-tab="execute">执行策略</button>
         </div>
         <div class="view" data-view="export">
-          <p class="muted">导出当前图鉴、本周无尽关卡、当前队伍/等级/可用战斗道具，以及当前战斗 JS。导出内容不会上传；登录 UID 和请求头不会写入结果。</p>
-          <label class="check"><input class="include-all" type="checkbox"> 附带全部已加载 JS（文件会大很多）</label>
-          <div class="actions">
-            <button class="primary copy-export">复制完整 JSON</button>
-            <button class="download-export">下载完整 JSON</button>
-            <button class="download-snapshot">下载 snapshot.json</button>
+          <p class="muted">复制和下载共用下面的范围。仅选择这次真正需要的数据；导出内容不会上传，登录 UID 和请求头不会写入结果。</p>
+          <div class="scope-card">
+            <div class="scope-title">导出范围</div>
+            <label class="check"><input class="include-catalog" type="checkbox" checked> 图鉴基础数据（猫、鼠、道具、规则）</label>
+            <div class="scope-heading"><span>队伍信息（账号相关）</span></div>
+            <label class="check"><input class="include-team" type="checkbox" checked> 当前队伍、槽位和等级</label>
+            <label class="check"><input class="include-owned" type="checkbox"> 已拥有猫咪的等级列表</label>
+            <label class="check"><input class="include-inventory" type="checkbox" checked> 当前战斗道具数量</label>
+            <div class="scope-heading">
+              <span>页面关卡（逐关勾选）</span>
+              <span class="stage-tools">
+                <button class="stage-all" type="button">全选</button>
+                <button class="stage-none" type="button">清空</button>
+                <button class="stage-endless" type="button">仅当前无尽</button>
+              </span>
+            </div>
+            <div class="stage-list" role="group" aria-label="导出关卡"><div class="stage-empty">正在读取页面关卡…</div></div>
+            <p class="muted stage-summary">尚未读取关卡。</p>
+            <div class="scope-heading">战斗 JS（可选）</div>
+            <label class="check radio"><input class="js-scope" type="radio" name="export-js-scope" value="none" checked> 不导出 JS（只取数据时推荐）</label>
+            <label class="check radio"><input class="js-scope" type="radio" name="export-js-scope" value="battle"> 仅当前战斗 JS（正文、大小和 SHA-256）</label>
+            <label class="check radio"><input class="js-scope" type="radio" name="export-js-scope" value="all"> 当前战斗 JS + 全部同源已加载 JS 正文</label>
+            <p class="muted scope-note">“全部同源已加载 JS”会写入当前页面加载过的每个同源 .js 完整正文，通常有数 MiB；只做数据或关卡分析时保持“不导出”即可。</p>
           </div>
+          <div class="actions">
+            <button class="primary copy-export">复制所选 JSON</button>
+            <button class="download-export">下载所选 JSON</button>
+            <button class="download-snapshot">下载模拟器快照</button>
+          </div>
+          <p class="muted scope-note">“下载模拟器快照”会生成模拟器的 data/snapshot.json 格式，只含所选图鉴和关卡，不含队伍、道具数量或 JS。需要勾选图鉴基础数据并至少选择 1 个关卡。</p>
           <div class="copy-fallback" hidden>
             <p class="muted">自动复制失败。文本框中的内容已选中，请按 Ctrl+C。</p>
             <textarea readonly></textarea>
@@ -168,7 +225,16 @@
       close: root.querySelector(".close"),
       tabs: [...root.querySelectorAll("[data-tab]")],
       views: [...root.querySelectorAll("[data-view]")],
-      includeAll: root.querySelector(".include-all"),
+      includeCatalog: root.querySelector(".include-catalog"),
+      includeTeam: root.querySelector(".include-team"),
+      includeOwned: root.querySelector(".include-owned"),
+      includeInventory: root.querySelector(".include-inventory"),
+      jsScopes: [...root.querySelectorAll(".js-scope")],
+      stageList: root.querySelector(".stage-list"),
+      stageSummary: root.querySelector(".stage-summary"),
+      stageAll: root.querySelector(".stage-all"),
+      stageNone: root.querySelector(".stage-none"),
+      stageEndless: root.querySelector(".stage-endless"),
       copyExport: root.querySelector(".copy-export"),
       downloadExport: root.querySelector(".download-export"),
       downloadSnapshot: root.querySelector(".download-snapshot"),
@@ -192,6 +258,9 @@
   function wireUi() {
     ui.launcher.addEventListener("click", () => {
       ui.panel.hidden = !ui.panel.hidden;
+      if (!ui.panel.hidden && !ui.views.find((view) => view.dataset.view === "export").hidden) {
+        ensureStageOptions().catch((error) => setExportStatus(error.message, true));
+      }
     });
     ui.close.addEventListener("click", () => {
       ui.panel.hidden = true;
@@ -200,7 +269,9 @@
       tab.addEventListener("click", () => showTab(tab.dataset.tab));
     }
     ui.copyExport.addEventListener("click", () => runBusy(async () => {
-      const captured = await captureExport();
+      await ensureStageOptions();
+      const selection = readExportSelection();
+      const captured = await captureExport(selection);
       const text = JSON.stringify(captured.full, null, 2);
       if (await copyText(text)) {
         ui.copyFallback.hidden = true;
@@ -214,17 +285,35 @@
       }
     }));
     ui.downloadExport.addEventListener("click", () => runBusy(async () => {
-      const captured = await captureExport();
+      await ensureStageOptions();
+      const selection = readExportSelection();
+      const captured = await captureExport(selection);
       const text = JSON.stringify(captured.full, null, 2) + "\n";
       download(`ilovecat-export-${stamp()}.json`, text);
-      setExportStatus(`已下载完整 JSON（${formatBytes(text.length)}）。`);
+      setExportStatus(`已下载所选 JSON（${formatBytes(text.length)}）。`);
     }));
     ui.downloadSnapshot.addEventListener("click", () => runBusy(async () => {
-      const captured = await captureExport({ skipLogic: true });
+      await ensureStageOptions();
+      const selection = readExportSelection();
+      assertSnapshotSelection(selection);
+      const captured = await captureExport({
+        ...selection,
+        includeTeam: false,
+        includeOwned: false,
+        includeInventory: false,
+        jsScope: "none",
+      }, "snapshot");
       const text = JSON.stringify(captured.snapshot, null, 2) + "\n";
       download(`snapshot-${stamp()}.json`, text);
-      setExportStatus(`已下载可直接用于模拟器的 snapshot.json（${formatBytes(text.length)}）。`);
+      setExportStatus(`已下载 ${captured.stageCount} 个所选关卡的模拟器快照（${formatBytes(text.length)}）。`);
     }));
+    for (const control of [ui.includeCatalog, ui.includeTeam, ui.includeOwned, ui.includeInventory, ...ui.jsScopes]) {
+      control.addEventListener("change", updateExportControls);
+    }
+    ui.stageAll.addEventListener("click", () => setStageSelection("all"));
+    ui.stageNone.addEventListener("click", () => setStageSelection("none"));
+    ui.stageEndless.addEventListener("click", () => setStageSelection("endless"));
+    ui.stageList.addEventListener("change", updateExportControls);
     ui.validate.addEventListener("click", () => runBusy(() => validateFromUi()));
     ui.loadStrategy.addEventListener("click", () => ui.strategyFile.click());
     ui.strategyFile.addEventListener("change", () => runBusy(async () => {
@@ -252,11 +341,13 @@
       executor.autoSpeedStuckSince = 0;
       executor.autoSpeedMissingSince = 0;
     });
+    updateExportControls();
   }
 
   function showTab(name) {
     for (const tab of ui.tabs) tab.classList.toggle("active", tab.dataset.tab === name);
     for (const view of ui.views) view.hidden = view.dataset.view !== name;
+    if (name === "export") ensureStageOptions().catch((error) => setExportStatus(error.message, true));
   }
 
   async function runBusy(task) {
@@ -275,7 +366,7 @@
       busy = false;
       ui.copyExport.disabled = false;
       ui.downloadExport.disabled = false;
-      ui.downloadSnapshot.disabled = false;
+      updateExportControls();
     }
   }
 
@@ -306,89 +397,284 @@
     return body.data;
   }
 
-  async function captureExport({ skipLogic = false } = {}) {
-    setExportStatus("正在读取图鉴、无尽关卡和当前队伍…");
-    const [catalog, endless, state] = await Promise.all([
-      apiGet("catalog"),
-      apiGet("endless"),
-      apiGet("state"),
-    ]);
-    if (!catalog || !endless?.stage || !state) throw new Error("接口返回缺少 catalog、endless.stage 或 state。");
+  // testable:buildStageEntries
+  function buildStageEntries(catalog, endless) {
+    const entries = [];
+    const seen = new Set();
+    const add = (stage, kind, endlessMeta = null) => {
+      if (stage?.id == null) return;
+      const key = `${kind}:${stage.id}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      entries.push({ key, kind, stage, endlessMeta });
+    };
+    add(endless?.stage, "endless", endless
+      ? { season: endless.season, ends: endless.ends }
+      : null);
+    for (const stage of catalog?.stages ?? []) add(stage, "campaign");
+    return entries;
+  }
+  // end testable:buildStageEntries
+
+  // testable:buildSelectedSnapshot
+  function buildSelectedSnapshot({ catalog, selectedStages, includeCatalog, capturedAt, source }) {
+    const campaign = selectedStages.filter((entry) => entry.kind === "campaign");
+    const endless = selectedStages.find((entry) => entry.kind === "endless") ?? null;
+    const snapshot = { schemaVersion: 1, capturedAt, source };
+    if (includeCatalog) {
+      snapshot.catalog = {};
+      for (const key of ["cats", "mice", "items", "rules"]) {
+        if (catalog?.[key] !== undefined) snapshot.catalog[key] = catalog[key];
+      }
+      if (campaign.length) snapshot.catalog.stages = campaign.map((entry) => entry.stage);
+    }
+    const primary = endless?.stage ?? campaign[0]?.stage ?? null;
+    if (primary) snapshot.stage = primary;
+    if (endless?.endlessMeta) snapshot.endlessMeta = endless.endlessMeta;
+    return snapshot;
+  }
+  // end testable:buildSelectedSnapshot
+
+  async function ensureStageOptions() {
+    if (stageOptions) return stageOptions;
+    if (stageOptionsPromise) return stageOptionsPromise;
+    stageOptionsPromise = (async () => {
+      setExportStatus("正在读取页面可选关卡…");
+      const [catalog, endless] = await Promise.all([apiGet("catalog"), apiGet("endless")]);
+      if (!catalog) throw new Error("接口返回缺少 catalog，无法列出关卡。");
+      const entries = buildStageEntries(catalog, endless);
+      if (!entries.length) throw new Error("页面没有返回可导出的关卡。");
+      stageOptions = { catalog, endless, entries };
+      renderStageOptions(entries);
+      updateExportControls();
+      const endlessCount = entries.filter((entry) => entry.kind === "endless").length;
+      setExportStatus(`已读取 ${entries.length - endlessCount} 个普通关卡和 ${endlessCount} 个当前无尽关卡。`);
+      return stageOptions;
+    })().finally(() => {
+      stageOptionsPromise = null;
+    });
+    return stageOptionsPromise;
+  }
+
+  function renderStageOptions(entries) {
+    const selectedBefore = new Set(
+      [...ui.stageList.querySelectorAll('input[type="checkbox"]')].map((input) => input.value),
+    );
+    const hadOptions = previousStageKeys.length > 0;
+    const previouslyAll = hadOptions && selectedBefore.size === previousStageKeys.length;
+    const fragment = document.createDocumentFragment();
+    for (const entry of entries) {
+      const input = document.createElement("input");
+      input.type = "checkbox";
+      input.value = entry.key;
+      input.checked = !hadOptions || selectedBefore.has(entry.key)
+        || (previouslyAll && !previousStageKeys.includes(entry.key));
+      const label = document.createElement("label");
+      label.className = "stage-option";
+      const kind = document.createElement("span");
+      kind.className = "stage-kind";
+      kind.textContent = entry.kind === "endless" ? "当前无尽" : `关卡 ${entry.stage.id}`;
+      const detail = document.createElement("span");
+      const name = entry.stage.name || entry.stage.id;
+      const waves = entry.stage.waves?.length ?? 0;
+      detail.textContent = entry.kind === "endless"
+        ? `${name} · id ${entry.stage.id} · ${waves} 波`
+        : `${name} · ${waves} 波`;
+      label.title = `${kind.textContent}：${detail.textContent}`;
+      label.append(input, kind, detail);
+      fragment.append(label);
+    }
+    if (!entries.length) {
+      const empty = document.createElement("div");
+      empty.className = "stage-empty";
+      empty.textContent = "页面没有返回可导出的关卡。";
+      fragment.append(empty);
+    }
+    ui.stageList.replaceChildren(fragment);
+    previousStageKeys = entries.map((entry) => entry.key);
+    updateExportControls();
+  }
+
+  function setStageSelection(mode) {
+    for (const input of ui.stageList.querySelectorAll('input[type="checkbox"]')) {
+      input.checked = mode === "all"
+        || (mode === "endless" && input.value.startsWith("endless:"));
+    }
+    updateExportControls();
+  }
+
+  function readExportSelection() {
+    return {
+      includeCatalog: ui.includeCatalog.checked,
+      includeTeam: ui.includeTeam.checked,
+      includeOwned: ui.includeOwned.checked,
+      includeInventory: ui.includeInventory.checked,
+      stageKeys: [...ui.stageList.querySelectorAll('input[type="checkbox"]:checked')]
+        .map((input) => input.value),
+      jsScope: ui.jsScopes.find((input) => input.checked)?.value ?? "none",
+    };
+  }
+
+  function assertSnapshotSelection(selection) {
+    if (!selection.includeCatalog) {
+      throw new Error("模拟器快照需要勾选“图鉴基础数据”。");
+    }
+    if (!selection.stageKeys.length) {
+      throw new Error("模拟器快照至少需要勾选 1 个关卡。");
+    }
+  }
+
+  function updateExportControls() {
+    const stageInputs = [...ui.stageList.querySelectorAll('input[type="checkbox"]')];
+    const selectedCount = stageInputs.filter((input) => input.checked).length;
+    const rosterCount = [ui.includeTeam, ui.includeOwned, ui.includeInventory]
+      .filter((input) => input.checked).length;
+    const hasData = ui.includeCatalog.checked || rosterCount > 0 || selectedCount > 0
+      || ui.jsScopes.some((input) => input.checked && input.value !== "none");
+    if (stageInputs.length) {
+      const snapshotHint = ui.includeCatalog.checked
+        ? "模拟器快照已可用。"
+        : "模拟器快照还需要勾选图鉴基础数据。";
+      ui.stageSummary.textContent = `已选 ${selectedCount}/${stageInputs.length} 个关卡，每关包含完整波次。${snapshotHint}`;
+    } else {
+      ui.stageSummary.textContent = "正在读取页面关卡…";
+    }
+    if (busy) return;
+    ui.copyExport.disabled = !hasData;
+    ui.downloadExport.disabled = !hasData;
+    ui.downloadSnapshot.disabled = !ui.includeCatalog.checked || selectedCount === 0;
+    ui.downloadSnapshot.title = ui.downloadSnapshot.disabled
+      ? "需要勾选图鉴基础数据并至少选择 1 个关卡"
+      : `导出 ${selectedCount} 个关卡的模拟器快照`;
+  }
+
+  async function captureExport(selection, purpose = "selected") {
+    const needsState = selection.includeTeam || selection.includeOwned || selection.includeInventory;
+    const hasData = selection.includeCatalog || needsState || selection.stageKeys.length
+      || selection.jsScope !== "none";
+    if (!hasData) throw new Error("至少选择一项导出内容。");
+    setExportStatus("正在读取所选数据和页面关卡…");
+    const requests = [apiGet("catalog"), apiGet("endless")];
+    if (needsState) requests.push(apiGet("state"));
+    const [catalog, endless, state = null] = await Promise.all(requests);
+    if (!catalog) throw new Error("接口返回缺少 catalog。");
+    if (needsState && !state) throw new Error("接口返回缺少 state。");
+
+    const entries = buildStageEntries(catalog, endless);
+    stageOptions = { catalog, endless, entries };
+    renderStageOptions(entries);
+    const allowedKeys = new Set(entries.map((entry) => entry.key));
+    const selectedStages = entries.filter((entry) => selection.stageKeys.includes(entry.key));
+    if (selection.stageKeys.some((key) => !allowedKeys.has(key))) {
+      throw new Error("所选关卡已不在当前页面数据中，请重新勾选。");
+    }
+    if (purpose === "snapshot" && selectedStages.length === 0) {
+      throw new Error("模拟器快照至少需要勾选 1 个关卡。");
+    }
 
     const capturedAt = new Date().toISOString();
     const pagePath = location.origin + location.pathname;
-    const snapshot = {
-      schemaVersion: 1,
-      capturedAt,
-      source: pagePath,
-      catalog,
-      stage: endless.stage,
-      endlessMeta: {
-        season: endless.season,
-        ends: endless.ends,
-      },
-    };
-    const roster = buildRoster(catalog, state);
+    const snapshot = selection.includeCatalog || selectedStages.length
+      ? buildSelectedSnapshot({
+        catalog,
+        selectedStages,
+        includeCatalog: selection.includeCatalog,
+        capturedAt,
+        source: pagePath,
+      })
+      : null;
+    const roster = needsState ? buildRoster(catalog, state, selection) : null;
     let client = null;
-    if (!skipLogic) {
-      setExportStatus("正在识别并读取当前战斗 JS…");
-      client = await captureClientLogic(ui.includeAll.checked);
+    if (selection.jsScope !== "none") {
+      setExportStatus("正在识别并读取所选战斗 JS…");
+      client = await captureClientLogic(selection.jsScope);
     }
+    const stageSelection = selectedStages.map((entry) => ({
+      kind: entry.kind,
+      id: entry.stage.id,
+      name: entry.stage.name ?? null,
+      waves: entry.stage.waves?.length ?? 0,
+    }));
     const full = {
       format: EXPORT_FORMAT,
-      version: 1,
+      version: 2,
       capturedAt,
-      snapshot,
-      roster,
-      client,
+      selection: {
+        catalog: selection.includeCatalog,
+        team: selection.includeTeam,
+        ownedUnits: selection.includeOwned,
+        inventory: selection.includeInventory,
+        stages: stageSelection,
+        scripts: selection.jsScope,
+      },
+      ...(snapshot ? { snapshot } : {}),
+      ...(roster ? { roster } : {}),
+      ...(client ? { client } : {}),
       privacy: {
         excluded: ["uid", "cookies", "authorization", "cans", "clears", "stars", "pity", "draws", "attempts"],
-        note: "账号筛选只保留当前队伍、已拥有猫咪等级和战斗道具数量。",
+        note: "只包含本次勾选的数据；排除登录凭据、余额、通关/星级、抽卡和无尽次数。",
       },
     };
-    const summary = [
-      `图鉴：${catalog.cats?.length ?? 0} 猫 / ${catalog.mice?.length ?? 0} 鼠`,
-      `无尽：第 ${endless.stage.id} 关，${endless.stage.waves?.length ?? 0} 波`,
-      `队伍：${roster.team.length} 槽 / 已有 ${roster.ownedUnits.length} 只`,
-    ];
+    const summary = [];
+    if (selection.includeCatalog) {
+      summary.push(`图鉴：${catalog.cats?.length ?? 0} 猫 / ${catalog.mice?.length ?? 0} 鼠`);
+    }
+    summary.push(`关卡：已选 ${selectedStages.length} 个，每关含完整波次`);
+    if (roster) {
+      const rosterParts = [];
+      if (roster.team) rosterParts.push(`${roster.team.length} 槽队伍`);
+      if (roster.ownedUnits) rosterParts.push(`已有 ${roster.ownedUnits.length} 只`);
+      if (roster.inventory) rosterParts.push("道具数量");
+      summary.push(`队伍信息：${rosterParts.join(" / ")}`);
+    }
     if (client) {
-      summary.push(`战斗 JS：${client.battleBundles.map((item) => `${item.path} (${formatBytes(item.bytes)})`).join(", ")}`);
+      const bundleSize = client.battleBundles.reduce((total, item) => total + item.bytes, 0);
+      summary.push(`战斗 JS：${client.battleBundles.length} 个 bundle，${formatBytes(bundleSize)}${client.allScripts ? "；另含全部同源脚本正文" : ""}`);
     }
     setExportStatus(summary.join("\n"));
-    return { full, snapshot };
+    return { full, snapshot, stageCount: selectedStages.length };
   }
 
-  function buildRoster(catalog, state) {
+  // testable:buildRoster
+  function buildRoster(catalog, state, selection) {
     const cats = new Map((catalog.cats ?? []).map((cat) => [cat.id, cat]));
     const units = new Map((state.units ?? []).filter((unit) => unit.owned).map((unit) => [unit.cat_id, unit]));
-    const team = (state.team ?? []).map((id, slot) => {
-      const cat = cats.get(id);
-      return {
-        slot,
-        id,
-        name: cat?.name ?? id,
-        level: Number(units.get(id)?.level ?? 1),
-      };
-    });
-    const ownedUnits = (state.units ?? [])
-      .filter((unit) => unit.owned)
-      .map((unit) => ({
-        id: unit.cat_id,
-        name: cats.get(unit.cat_id)?.name ?? unit.cat_id,
-        level: Number(unit.level),
-      }));
-    const inventory = Object.fromEntries(
-      (catalog.items ?? []).map((item) => [item.id, Number(state.items?.[item.id] ?? 0)]),
-    );
-    return {
-      team,
-      scenarioTeam: team.map(({ id, level }) => ({ id, level })),
-      ownedUnits,
-      inventory,
-    };
+    const roster = {};
+    if (selection.includeTeam) {
+      roster.team = (state.team ?? []).map((id, slot) => {
+        const cat = cats.get(id);
+        return {
+          slot,
+          id,
+          name: cat?.name ?? id,
+          level: Number(units.get(id)?.level ?? 1),
+        };
+      });
+      roster.scenarioTeam = roster.team.map(({ id, level }) => ({ id, level }));
+    }
+    if (selection.includeOwned) {
+      roster.ownedUnits = (state.units ?? [])
+        .filter((unit) => unit.owned)
+        .map((unit) => ({
+          id: unit.cat_id,
+          name: cats.get(unit.cat_id)?.name ?? unit.cat_id,
+          level: Number(unit.level),
+        }));
+    }
+    if (selection.includeInventory) {
+      roster.inventory = Object.fromEntries(
+        (catalog.items ?? []).map((item) => [item.id, Number(state.items?.[item.id] ?? 0)]),
+      );
+    }
+    return roster;
   }
+  // end testable:buildRoster
 
-  async function captureClientLogic(includeAllScripts) {
+  async function captureClientLogic(jsScope) {
+    if (jsScope !== "battle" && jsScope !== "all") {
+      throw new Error(`未知的 JS 导出范围：${jsScope}`);
+    }
+    const includeAllScripts = jsScope === "all";
     const all = loadedScripts();
     const cache = new Map();
     const load = async (url) => {
