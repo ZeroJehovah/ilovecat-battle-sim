@@ -113,7 +113,7 @@
         <div class="head">
           <div>
             <div class="title">喵喵的逆袭工具</div>
-            <div class="muted">v${USERSCRIPT_VERSION} · 只读导出；执行器只点击页面上的战斗按钮</div>
+            <div class="muted">v${USERSCRIPT_VERSION} · 只读导出；执行器只操作页面按钮和游戏键盘事件</div>
           </div>
           <button class="close" title="收起">×</button>
         </div>
