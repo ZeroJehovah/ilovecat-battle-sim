@@ -23,7 +23,7 @@ test("the userscript is syntactically valid and exposes both workflows", () => {
   assert.doesNotThrow(() => new Function(source));
   assert.match(source, /@match\s+https:\/\/api\.ilovecat520\.me\/\*/);
   assert.match(source, /@updateURL\s+https:\/\/raw\.githubusercontent\.com\/ZeroJehovah\/ilovecat-battle-sim\/main\/tools\/ilovecat-workbench\.user\.js/);
-  assert.match(source, /USERSCRIPT_VERSION = "0\.3\.1"/);
+  assert.match(source, /USERSCRIPT_VERSION = "0\.3\.2"/);
   assert.match(source, /ilovecat-game-export/);
   assert.match(source, /ilovecat-battle-strategy/);
   assert.match(source, /battleBundles/);
@@ -73,9 +73,9 @@ test("the userscript is syntactically valid and exposes both workflows", () => {
   assert.match(source, /仅限时活动/);
   assert.match(source, /apiGet\("raid"\)/);
   assert.match(source, /js-scope/);
-  assert.match(source, /下载模拟器快照/);
   assert.match(source, /复制所选 JSON/);
   assert.match(source, /下载所选 JSON/);
+  assert.doesNotMatch(source, /download-snapshot/);
 });
 
 test("the export scope lists campaign, endless and active raid stages", () => {

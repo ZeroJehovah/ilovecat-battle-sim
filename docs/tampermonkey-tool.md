@@ -16,7 +16,7 @@ https://raw.githubusercontent.com/ZeroJehovah/ilovecat-battle-sim/main/tools/ilo
 
 也可以在“执行策略”页直接点击“导入 JSON 文件”，避免长策略经过剪贴板时只复制到部分内容。
 
-面板标题下方会显示当前版本号；脚本声明了 `@updateURL` 和 `@downloadURL`，Tampermonkey 可以直接检查 GitHub `main` 分支更新。`0.3.1` 在按范围导出的基础上补充了限时全服头目关卡；策略侧继续支持准备界面校验、可选的自动开战、中文队伍预览、消耗品自动勾选、`6–0` 后台页键盘部署、按 250 ms 边界精确调度下一次动作，以及空闲自动倍速。
+面板标题下方会显示当前版本号；脚本声明了 `@updateURL` 和 `@downloadURL`，Tampermonkey 可以直接检查 GitHub `main` 分支更新。`0.3.2` 移除了与所选 JSON 重复的独立快照下载按钮，并保留所选 JSON 内的限时全服头目和模拟器快照；策略侧继续支持准备界面校验、可选的自动开战、中文队伍预览、消耗品自动勾选、`6–0` 后台页键盘部署、按 250 ms 边界精确调度下一次动作，以及空闲自动倍速。
 
 脚本匹配游戏域名下的页面，但只有点击猫咪按钮后才读取数据。导出请求与普通页面请求使用同一登录态；脚本不会展示、复制或上传 UID、Cookie 或请求头。
 
@@ -37,9 +37,15 @@ https://raw.githubusercontent.com/ZeroJehovah/ilovecat-battle-sim/main/tools/ilo
 
 导出结果的 `selection` 会记录本次勾选；`snapshot` 只包含所选图鉴字段和所选关卡，`roster`、`client` 则只在勾选相应范围时出现。
 
-## 模拟器快照
+## 提取模拟器快照
 
-“下载模拟器快照”会生成可放到模拟器 `data/snapshot.json` 的顶层结构，包括 `schemaVersion`、`capturedAt`、`source`、所选 `catalog` 字段和所选关卡；它不包含当前队伍、道具数量或 JS。
+所选 JSON 的 `snapshot` 字段就是可放到模拟器 `data/snapshot.json` 的顶层结构，包括 `schemaVersion`、`capturedAt`、`source`、所选 `catalog` 字段和所选关卡；它不包含当前队伍、道具数量或 JS。界面不再单独生成快照文件，避免维护两个数据相同的下载入口。
+
+使用 `jq` 时可以直接提取：
+
+```bash
+jq '.snapshot' ilovecat-export-YYYYMMDD-HHMMSS.json > snapshot.json
+```
 
 - 必须勾选“图鉴基础数据”和至少 1 个关卡；
 - 选择普通关卡或限时全服头目时，所选关卡进入 `catalog.stages`；如果没有选择当前无尽关卡，优先把限时头目、其次把第一个所选普通关卡写入 `stage`，让快照可以直接运行；

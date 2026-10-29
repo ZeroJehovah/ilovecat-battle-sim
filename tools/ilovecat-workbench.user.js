@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         喵喵的逆袭 · 数据导出与策略执行
 // @namespace    https://github.com/ZeroJehovah/ilovecat-battle-sim
-// @version      0.3.1
+// @version      0.3.2
 // @description  按范围只读导出战斗数据与 JS，并按 JSON 策略操作战斗页面；支持空闲自动倍速
 // @match        https://api.ilovecat520.me/*
 // @updateURL    https://raw.githubusercontent.com/ZeroJehovah/ilovecat-battle-sim/main/tools/ilovecat-workbench.user.js
@@ -15,7 +15,7 @@
 
   const STRATEGY_FORMAT = "ilovecat-battle-strategy";
   const EXPORT_FORMAT = "ilovecat-game-export";
-  const USERSCRIPT_VERSION = "0.3.1";
+  const USERSCRIPT_VERSION = "0.3.2";
   const STORAGE_KEY = "ilovecat-workbench-strategy";
   const ACTION_GAP_MS = 250;
   const LOOP_MS = 100;
@@ -191,9 +191,8 @@
           <div class="actions">
             <button class="primary copy-export">复制所选 JSON</button>
             <button class="download-export">下载所选 JSON</button>
-            <button class="download-snapshot">下载模拟器快照</button>
           </div>
-          <p class="muted scope-note">“下载模拟器快照”会生成模拟器的 data/snapshot.json 格式，只含所选图鉴和关卡，不含队伍、道具数量或 JS。需要勾选图鉴基础数据并至少选择 1 个关卡。</p>
+          <p class="muted scope-note">所选 JSON 的 snapshot 字段就是模拟器 data/snapshot.json 所需结构；需要图鉴和至少 1 个关卡才能直接运行，队伍和 JS 不会进入该字段。</p>
           <div class="copy-fallback" hidden>
             <p class="muted">自动复制失败。文本框中的内容已选中，请按 Ctrl+C。</p>
             <textarea readonly></textarea>
@@ -239,7 +238,6 @@
       stageRaid: root.querySelector(".stage-raid"),
       copyExport: root.querySelector(".copy-export"),
       downloadExport: root.querySelector(".download-export"),
-      downloadSnapshot: root.querySelector(".download-snapshot"),
       copyFallback: root.querySelector(".copy-fallback"),
       copyFallbackText: root.querySelector(".copy-fallback textarea"),
       exportStatus: root.querySelector(".export-status"),
@@ -294,21 +292,6 @@
       download(`ilovecat-export-${stamp()}.json`, text);
       setExportStatus(`已下载所选 JSON（${formatBytes(text.length)}）。`);
     }));
-    ui.downloadSnapshot.addEventListener("click", () => runBusy(async () => {
-      await ensureStageOptions();
-      const selection = readExportSelection();
-      assertSnapshotSelection(selection);
-      const captured = await captureExport({
-        ...selection,
-        includeTeam: false,
-        includeOwned: false,
-        includeInventory: false,
-        jsScope: "none",
-      }, "snapshot");
-      const text = JSON.stringify(captured.snapshot, null, 2) + "\n";
-      download(`snapshot-${stamp()}.json`, text);
-      setExportStatus(`已下载 ${captured.stageCount} 个所选关卡的模拟器快照（${formatBytes(text.length)}）。`);
-    }));
     for (const control of [ui.includeCatalog, ui.includeTeam, ui.includeOwned, ui.includeInventory, ...ui.jsScopes]) {
       control.addEventListener("change", updateExportControls);
     }
@@ -358,7 +341,6 @@
     busy = true;
     ui.copyExport.disabled = true;
     ui.downloadExport.disabled = true;
-    ui.downloadSnapshot.disabled = true;
     try {
       await task();
     } catch (error) {
@@ -563,15 +545,6 @@
     };
   }
 
-  function assertSnapshotSelection(selection) {
-    if (!selection.includeCatalog) {
-      throw new Error("模拟器快照需要勾选“图鉴基础数据”。");
-    }
-    if (!selection.stageKeys.length) {
-      throw new Error("模拟器快照至少需要勾选 1 个关卡。");
-    }
-  }
-
   function updateExportControls() {
     const stageInputs = [...ui.stageList.querySelectorAll('input[type="checkbox"]')];
     const selectedCount = stageInputs.filter((input) => input.checked).length;
@@ -581,8 +554,8 @@
       || ui.jsScopes.some((input) => input.checked && input.value !== "none");
     if (stageInputs.length) {
       const snapshotHint = ui.includeCatalog.checked
-        ? "模拟器快照已可用。"
-        : "模拟器快照还需要勾选图鉴基础数据。";
+        ? "所选 JSON 的 snapshot 将包含这些关卡。"
+        : "若需要模拟器快照，还要勾选图鉴基础数据。";
       ui.stageSummary.textContent = `已选 ${selectedCount}/${stageInputs.length} 个关卡，每关包含完整波次。${snapshotHint}`;
     } else {
       ui.stageSummary.textContent = "正在读取页面关卡…";
@@ -590,13 +563,9 @@
     if (busy) return;
     ui.copyExport.disabled = !hasData;
     ui.downloadExport.disabled = !hasData;
-    ui.downloadSnapshot.disabled = !ui.includeCatalog.checked || selectedCount === 0;
-    ui.downloadSnapshot.title = ui.downloadSnapshot.disabled
-      ? "需要勾选图鉴基础数据并至少选择 1 个关卡"
-      : `导出 ${selectedCount} 个关卡的模拟器快照`;
   }
 
-  async function captureExport(selection, purpose = "selected") {
+  async function captureExport(selection) {
     const needsState = selection.includeTeam || selection.includeOwned || selection.includeInventory;
     const hasData = selection.includeCatalog || needsState || selection.stageKeys.length
       || selection.jsScope !== "none";
@@ -618,9 +587,6 @@
     }
     if (selection.stageKeys.some((key) => !allowedKeys.has(key))) {
       throw new Error("所选关卡已不在当前页面数据中，请重新勾选。");
-    }
-    if (purpose === "snapshot" && selectedStages.length === 0) {
-      throw new Error("模拟器快照至少需要勾选 1 个关卡。");
     }
 
     const capturedAt = new Date().toISOString();
@@ -683,7 +649,7 @@
       summary.push(`战斗 JS：${client.battleBundles.length} 个 bundle，${formatBytes(bundleSize)}${client.allScripts ? "；另含全部同源脚本正文" : ""}`);
     }
     setExportStatus(summary.join("\n"));
-    return { full, snapshot, stageCount: selectedStages.length };
+    return { full, snapshot };
   }
 
   // testable:buildRoster
