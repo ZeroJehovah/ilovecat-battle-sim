@@ -11,7 +11,7 @@ test("the userscript is syntactically valid and exposes both workflows", () => {
   assert.doesNotThrow(() => new Function(source));
   assert.match(source, /@match\s+https:\/\/api\.ilovecat520\.me\/\*/);
   assert.match(source, /@updateURL\s+https:\/\/raw\.githubusercontent\.com\/ZeroJehovah\/ilovecat-battle-sim\/main\/tools\/ilovecat-workbench\.user\.js/);
-  assert.match(source, /USERSCRIPT_VERSION = "0\.1\.9"/);
+  assert.match(source, /USERSCRIPT_VERSION = "0\.2\.0"/);
   assert.match(source, /ilovecat-game-export/);
   assert.match(source, /ilovecat-battle-strategy/);
   assert.match(source, /battleBundles/);
@@ -42,6 +42,12 @@ test("the userscript is syntactically valid and exposes both workflows", () => {
   assert.match(source, /自动勾选策略所需消耗品/);
   assert.match(source, /item-warning/);
   assert.match(source, /readBattleSpeed/);
+  assert.match(source, /autoSpeed/);
+  assert.match(source, /manageAutoSpeed/);
+  assert.match(source, /estimateNextAction/);
+  assert.match(source, /BATTLE_SPEED_KEY/);
+  assert.match(source, /空闲 3×/);
+  assert.match(source, /当前不会执行策略动作/);
   assert.match(source, /pressDeployKey/);
   assert.match(source, /deployKeyForSlot/);
   assert.match(source, /new KeyboardEvent\("keydown"/);

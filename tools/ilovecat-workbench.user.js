@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         喵喵的逆袭 · 数据导出与策略执行
 // @namespace    https://github.com/ZeroJehovah/ilovecat-battle-sim
-// @version      0.1.9
-// @description  只读导出战斗数据与当前 JS，并按 JSON 策略操作战斗页面
+// @version      0.2.0
+// @description  只读导出战斗数据与当前 JS，并按 JSON 策略操作战斗页面；支持空闲自动倍速
 // @match        https://api.ilovecat520.me/*
 // @updateURL    https://raw.githubusercontent.com/ZeroJehovah/ilovecat-battle-sim/main/tools/ilovecat-workbench.user.js
 // @downloadURL  https://raw.githubusercontent.com/ZeroJehovah/ilovecat-battle-sim/main/tools/ilovecat-workbench.user.js
@@ -15,12 +15,17 @@
 
   const STRATEGY_FORMAT = "ilovecat-battle-strategy";
   const EXPORT_FORMAT = "ilovecat-game-export";
-  const USERSCRIPT_VERSION = "0.1.9";
+  const USERSCRIPT_VERSION = "0.2.0";
   const STORAGE_KEY = "ilovecat-workbench-strategy";
   const ACTION_GAP_MS = 250;
   const LOOP_MS = 100;
   const BATTLE_START_TIMEOUT_MS = 20000;
   const CANNON_READY = 1;
+  const BATTLE_SPEED_KEY = "snowapi-cat-battle-speed";
+  const AUTO_SPEED_BASE_EXIT_SECONDS = 5;
+  const AUTO_SPEED_MAX_EXTRA_EXIT_SECONDS = 6;
+  const AUTO_SPEED_ENTER_LEAD_SECONDS = 4;
+  const AUTO_SPEED_STUCK_MS = 1800;
   const ITEM_NAMES = {
     start_coins: "開場金幣",
     fast_coins: "加速補給",
@@ -31,6 +36,7 @@
 
   let executor = null;
   let busy = false;
+  let speedRestoreToken = 0;
 
   window.__ilovecatWorkbenchV1?.destroy?.();
 
@@ -41,6 +47,7 @@
   window.__ilovecatWorkbenchV1 = {
     destroy() {
       stopExecutor("", false);
+      speedRestoreToken++;
       ui.host.remove();
       delete window.__ilovecatWorkbenchV1;
     },
@@ -142,6 +149,8 @@
           <label class="check warning"><input class="auto-start" type="checkbox"> 无战斗时由脚本点击“开始战斗”（消耗 1 次挑战）</label>
           <p class="item-warning" hidden></p>
           <label class="check warning"><input class="auto-items" type="checkbox"> 自动勾选策略所需消耗品（会消耗库存）</label>
+          <label class="check"><input class="auto-speed" type="checkbox"> 自动倍速（空闲 3×，动作前切回 1×）</label>
+          <p class="muted">仅在估计至少约 9 个游戏秒内没有操作时切到 3×；2×/3× 时执行器不会执行任何策略动作。开战时会把游戏保存的起始倍速设为 1×。</p>
           <div class="actions">
             <button class="load-strategy">导入 JSON 文件</button>
             <button class="validate">校验</button>
@@ -170,6 +179,7 @@
       strategyFile: root.querySelector(".strategy-file"),
       autoStart: root.querySelector(".auto-start"),
       autoItems: root.querySelector(".auto-items"),
+      autoSpeed: root.querySelector(".auto-speed"),
       itemWarning: root.querySelector(".item-warning"),
       loadStrategy: root.querySelector(".load-strategy"),
       validate: root.querySelector(".validate"),
@@ -235,6 +245,12 @@
       } catch {
         // Keep the previous warning when the textarea is not yet valid JSON.
       }
+    });
+    ui.autoSpeed.addEventListener("change", () => {
+      if (!executor) return;
+      executor.autoSpeedTarget = 1;
+      executor.autoSpeedStuckSince = 0;
+      executor.autoSpeedMissingSince = 0;
     });
   }
 
@@ -1044,6 +1060,7 @@
     }
 
     stopExecutor("", false);
+    speedRestoreToken++;
     executor = {
       strategy,
       policy: strategy.policy,
@@ -1058,18 +1075,27 @@
       lastStatus: "",
       lastTime: 0,
       staleSince: performance.now(),
+      moneyHistory: [],
+      autoSpeedTarget: 1,
+      autoSpeedEta: null,
+      autoSpeedRaised: false,
+      autoSpeedStuckSince: 0,
+      autoSpeedMissingSince: 0,
       timer: null,
       stopped: false,
     };
     ui.run.disabled = true;
     ui.validate.disabled = true;
     executor.timer = setTimeout(executeTick, 0);
-    setRunStatus(`${combined.join("\n")}\n\n正在点击“开始战斗”…`);
+    const speedNote = ui.autoSpeed.checked ? "\n自动倍速：已把战斗保存倍速设为 1×。" : "";
+    setRunStatus(`${combined.join("\n")}${speedNote}\n\n正在点击“开始战斗”…`);
+    if (ui.autoSpeed.checked) setStoredBattleSpeed(1);
     prep.startButton.click();
   }
 
   function startExecutor(strategy, runtime) {
     stopExecutor("", false);
+    speedRestoreToken++;
     executor = {
       strategy,
       policy: strategy.policy,
@@ -1083,6 +1109,12 @@
       lastStatus: "",
       lastTime: runtime.snapshot.time,
       staleSince: performance.now(),
+      moneyHistory: [],
+      autoSpeedTarget: 1,
+      autoSpeedEta: null,
+      autoSpeedRaised: false,
+      autoSpeedStuckSince: 0,
+      autoSpeedMissingSince: 0,
       timer: null,
       stopped: false,
     };
@@ -1093,12 +1125,29 @@
   }
 
   function stopExecutor(message, updateStatus = true) {
+    const raised = Boolean(executor?.autoSpeedRaised);
+    const token = ++speedRestoreToken;
     if (executor?.timer) clearTimeout(executor.timer);
     if (executor) executor.stopped = true;
     executor = null;
     ui.run.disabled = false;
     ui.validate.disabled = false;
+    if (raised) {
+      setStoredBattleSpeed(1);
+      restoreSpeedTo1(token);
+    }
     if (message && updateStatus) setRunStatus(message);
+  }
+
+  async function restoreSpeedTo1(token) {
+    for (let attempt = 0; attempt < 4; attempt++) {
+      if (token !== speedRestoreToken) return;
+      const button = findBattleSpeedButton();
+      const current = readBattleSpeedNumber();
+      if (!button || button.disabled || current == null || current === 1) return;
+      button.click();
+      await new Promise((resolve) => setTimeout(resolve, ACTION_GAP_MS));
+    }
   }
 
   function scheduleExecutorTick() {
@@ -1159,14 +1208,27 @@
         executor.staleSince = performance.now();
       }
       if (performance.now() - executor.staleSince > 1500) return;
+      const autoSpeedOn = ui.autoSpeed.checked;
+      const speedState = autoSpeedOn
+        ? manageAutoSpeed(snapshot, runtime.context)
+        : (executor.autoSpeedRaised ? restoreAutoSpeedTick() : null);
+      if (speedState?.busy) {
+        executor.nextActionAt = performance.now() + ACTION_GAP_MS;
+        updateRunningStatus(snapshot, speedState);
+        return;
+      }
+      if (autoSpeedOn && speedState.current !== 1) {
+        updateRunningStatus(snapshot, speedState);
+        return;
+      }
       if (performance.now() < executor.nextActionAt) {
-        updateRunningStatus(snapshot);
+        updateRunningStatus(snapshot, speedState);
         return;
       }
       const acted = decideAndAct(snapshot, runtime.context);
       if (!executor || executor.stopped) return;
       if (acted) executor.nextActionAt = performance.now() + ACTION_GAP_MS;
-      updateRunningStatus(snapshot);
+      updateRunningStatus(snapshot, speedState);
     } catch (error) {
       stopExecutor(`执行器错误：${error instanceof Error ? error.message : String(error)}`);
     } finally {
@@ -1344,14 +1406,190 @@
     return match ? Number(match[1]) - 1 : null;
   }
 
-  function readBattleSpeed() {
-    const button = [...document.querySelectorAll("button")].find((candidate) => {
-      return /战斗速度|戰鬥速度/.test(candidate.title || "");
-    });
-    return (button?.innerText || "").trim().replace(/\s+/g, " ");
+  function findBattleSpeedButton() {
+    return [...document.querySelectorAll("button")].find((candidate) => {
+      const label = `${candidate.title || ""} ${candidate.getAttribute("aria-label") || ""}`;
+      return /战斗速度|戰鬥速度|Battle speed/i.test(label);
+    }) || null;
   }
 
-  function updateRunningStatus(snapshot) {
+  function readBattleSpeedNumber() {
+    const button = findBattleSpeedButton();
+    if (!button) return null;
+    const label = `${button.innerText || ""} ${button.getAttribute("aria-label") || ""}`;
+    const match = label.match(/([123])\s*(?:[×x]|倍)/i);
+    return match ? Number(match[1]) : null;
+  }
+
+  function setStoredBattleSpeed(speed) {
+    try {
+      localStorage.setItem(BATTLE_SPEED_KEY, String(speed));
+    } catch {
+      // Storage is optional; the battle still starts at the previous speed.
+    }
+  }
+
+  function cycleBattleSpeed() {
+    const button = findBattleSpeedButton();
+    if (!button || button.disabled) return false;
+    button.click();
+    return true;
+  }
+
+  function estimateIncome(snapshot, context) {
+    const walletLevel = Math.max(1, Number(snapshot.walletLevel ?? 1));
+    const hasFastCoins = (context?.items ?? []).some((item) => {
+      return (typeof item === "string" ? item : item?.id) === "fast_coins";
+    });
+    const base = (25 + 8 * (walletLevel - 1)) * (hasFastCoins ? 1.3 : 1);
+    const history = executor.moneyHistory;
+    const sample = { time: snapshot.time, money: snapshot.money, walletLevel };
+    const last = history.at(-1);
+    if (!last || sample.time < last.time || sample.time - last.time > 1) history.length = 0;
+    else if (sample.money < last.money || sample.walletLevel !== last.walletLevel) history.length = 0;
+    history.push(sample);
+    while (history.length > 2 && sample.time - history[0].time > 3) history.shift();
+    if (history.length < 2) return { rate: base, base };
+    const first = history[0];
+    const seconds = sample.time - first.time;
+    const observed = seconds > 0 ? (sample.money - first.money) / seconds : base;
+    return { rate: Math.max(base, observed), base };
+  }
+
+  function earliestCandidate(candidates) {
+    if (!candidates.length) return null;
+    return candidates.reduce((best, candidate) => candidate.at < best.at ? candidate : best);
+  }
+
+  function estimateNextAction(snapshot, context, income) {
+    const policy = executor.policy;
+    const now = snapshot.time;
+    const candidates = [];
+    const add = (at, reason) => {
+      if (!Number.isFinite(at)) return;
+      candidates.push({ at: Math.max(now, at), reason });
+    };
+
+    for (let index = executor.actionIndex; index < policy.actions.length; index++) {
+      const action = policy.actions[index];
+      if (action.type === "wait") continue;
+      add(action.at, `定时${action.type}`);
+      break;
+    }
+
+    if (!policy.automatic) return earliestCandidate(candidates);
+
+    const money = Number(snapshot.money ?? 0);
+    const maxMoney = Number(snapshot.maxMoney ?? (600 + 400 * (Number(snapshot.walletLevel ?? 1) - 1)));
+    const team = context.team;
+    const cooldowns = snapshot.cooldowns ?? [];
+    const counts = snapshot.onField ?? {};
+
+    const affordAt = (cost) => {
+      const deficit = Math.max(0, Number(cost) - money);
+      if (deficit <= 0) return now;
+      if (money >= maxMoney) return Number.POSITIVE_INFINITY;
+      return now + deficit / Math.max(1e-9, income.rate);
+    };
+
+    const deployAt = (id) => {
+      const slot = team.findIndex((entry) => entry.id === id);
+      if (slot < 0) return Number.POSITIVE_INFINITY;
+      if (Number(snapshot.cats ?? 0) >= 20) return now;
+      const entry = team[slot];
+      const cooldown = Math.max(0, Number(cooldowns[slot] ?? 0)) * Math.max(0, Number(entry.cooldown ?? 0));
+      return Math.max(now + cooldown, affordAt(entry.cost ?? 0));
+    };
+
+    if (snapshot.walletLevel < policy.walletTarget) {
+      add(affordAt(snapshot.walletCost), "钱包");
+    }
+    for (const id of policy.openers) {
+      if (!executor.opened.has(id)) add(deployAt(id), `首发${id}`);
+    }
+    if (executor.sequenceIndex < policy.deploySequence.length) {
+      add(deployAt(policy.deploySequence[executor.sequenceIndex]), "固定序列");
+    }
+    for (const id of policy.priority) {
+      if ((counts[id] ?? 0) < (policy.targetCounts[id] ?? 0)) add(deployAt(id), `补位${id}`);
+    }
+    if (policy.fallbackPriority.length) {
+      if (now >= policy.fallbackAfter) {
+        for (const id of policy.fallbackPriority) add(deployAt(id), `兜底${id}`);
+      } else {
+        add(policy.fallbackAfter, "兜底时间");
+      }
+    }
+    if (policy.autoCannon) {
+      const cannon = Number(snapshot.cannon ?? 0);
+      add(
+        cannon >= CANNON_READY ? now : now + (CANNON_READY - cannon) * 30,
+        cannon >= CANNON_READY ? "猫爪炮已充满" : "猫爪炮",
+      );
+    }
+    return earliestCandidate(candidates);
+  }
+
+  function manageAutoSpeed(snapshot, context) {
+    const current = readBattleSpeedNumber();
+    if (current == null) {
+      const missingSince = executor.autoSpeedMissingSince ||= performance.now();
+      if (performance.now() - missingSince > AUTO_SPEED_STUCK_MS) {
+        throw new Error("自动倍速找不到战斗倍速按钮；为避免在未知倍速下执行动作，执行器已停止。");
+      }
+      return { current: null, target: 1, eta: null, reason: "倍速未知", busy: false };
+    }
+    executor.autoSpeedMissingSince = 0;
+
+    const income = estimateIncome(snapshot, context);
+    const estimate = estimateNextAction(snapshot, context, income);
+    const eta = estimate ? Math.max(0, estimate.at - snapshot.time) : Number.POSITIVE_INFINITY;
+    const extraExit = Math.min(
+      AUTO_SPEED_MAX_EXTRA_EXIT_SECONDS,
+      Math.max(0, income.rate - income.base) * 1.5,
+    );
+    const exitSeconds = AUTO_SPEED_BASE_EXIT_SECONDS + extraExit;
+    const enterSeconds = exitSeconds + AUTO_SPEED_ENTER_LEAD_SECONDS;
+    const target = executor.autoSpeedTarget === 3
+      ? (eta <= exitSeconds ? 1 : 3)
+      : (eta >= enterSeconds ? 3 : 1);
+    executor.autoSpeedTarget = target;
+    executor.autoSpeedEta = eta;
+    executor.autoSpeedReason = estimate?.reason ?? "无后续动作";
+
+    if (current === target) {
+      executor.autoSpeedStuckSince = 0;
+      if (current > 1) executor.autoSpeedRaised = true;
+      return { current, target, eta, exitSeconds, busy: false };
+    }
+    if (performance.now() < executor.nextActionAt) {
+      return { current, target, eta, exitSeconds, busy: false, waiting: true };
+    }
+    const stuckSince = executor.autoSpeedStuckSince ||= performance.now();
+    if (performance.now() - stuckSince > AUTO_SPEED_STUCK_MS) {
+      throw new Error(`自动倍速无法从 ${current}× 切到 ${target}×；请手动切到 1× 后重试。`);
+    }
+    if (!cycleBattleSpeed()) {
+      return { current, target, eta, exitSeconds, busy: false, disabled: true };
+    }
+    executor.autoSpeedRaised = true;
+    return { current, target, eta, exitSeconds, busy: true };
+  }
+
+  function restoreAutoSpeedTick() {
+    const current = readBattleSpeedNumber();
+    if (current === 1 || current == null) {
+      if (current === 1) executor.autoSpeedRaised = false;
+      return { current, target: 1, eta: null, busy: false };
+    }
+    if (performance.now() < executor.nextActionAt) {
+      return { current, target: 1, eta: null, busy: false, waiting: true };
+    }
+    if (cycleBattleSpeed()) return { current, target: 1, eta: null, busy: true };
+    return { current, target: 1, eta: null, busy: false, disabled: true };
+  }
+
+  function updateRunningStatus(snapshot, speedState = null) {
     const policy = executor.policy;
     const counts = policy.priority
       .map((id) => `${id}:${snapshot.onField?.[id] ?? 0}/${policy.targetCounts[id] ?? 0}`)
@@ -1359,12 +1597,23 @@
     const sequence = policy.deploySequence.length
       ? `  序列 ${executor.sequenceIndex}/${policy.deploySequence.length}`
       : "";
-    const speed = readBattleSpeed();
-    const speedText = speed ? `  速度 ${speed}` : "";
-    const speedWarning = speed && !/^1\s*[×x]$/i.test(speed)
-      ? `\n提示：当前为 ${speed} 倍速；动作节流按真实时间，精确复刻建议 1×。`
-      : "";
-    const status = `运行中 t=${snapshot.time.toFixed(2)}s  钱包 ${snapshot.walletLevel}/${policy.walletTarget}${sequence}  金币 ${Math.floor(snapshot.money)}  场上 ${snapshot.cats}/20${speedText}\n${counts}${speedWarning}`;
+    const speed = speedState?.current ?? readBattleSpeedNumber();
+    const autoSpeed = ui.autoSpeed.checked;
+    const speedText = speed == null ? "" : `  速度 ${speed}×${autoSpeed ? "（自动）" : ""}`;
+    let speedNote = "";
+    if (autoSpeed) {
+      const eta = executor.autoSpeedEta;
+      const etaText = eta == null
+        ? ""
+        : Number.isFinite(eta)
+          ? `，预计 ${eta.toFixed(1)}s 后可能有操作（${executor.autoSpeedReason || ""}）`
+          : "，没有已知的后续操作";
+      speedNote = `\n自动倍速：${executor.autoSpeedTarget === 3 ? "空闲 3×" : "动作前 1×"}${etaText}。`;
+      if (speed != null && speed !== 1) speedNote += " 当前不会执行策略动作。";
+    } else if (speed != null && speed !== 1) {
+      speedNote = `\n提示：当前为 ${speed}× 倍速；动作节流按真实时间，精确复刻建议 1×。`;
+    }
+    const status = `运行中 t=${snapshot.time.toFixed(2)}s  钱包 ${snapshot.walletLevel}/${policy.walletTarget}${sequence}  金币 ${Math.floor(snapshot.money)}  场上 ${snapshot.cats}/20${speedText}\n${counts}${speedNote}`;
     if (status !== executor.lastStatus) {
       executor.lastStatus = status;
       setRunStatus(status);
@@ -1403,6 +1652,7 @@
                 id: String(cat.id ?? entry?.id ?? ""),
                 name: String(cat.name ?? cat.id ?? entry?.id ?? ""),
                 cost: Number(cat.cost ?? 0),
+                cooldown: Number(cat.cooldown ?? 0),
                 level: Number(entry?.level ?? 1),
               };
             }).filter((entry) => entry.id),

@@ -54,6 +54,10 @@ export class AutoPolicy {
     if (!Number.isFinite(this.actionGap) || this.actionGap < 0) {
       throw new Error("actionGap must be a non-negative number of seconds");
     }
+    this.observationDelay = Number(options.observationDelay ?? 0);
+    if (!Number.isFinite(this.observationDelay) || this.observationDelay < 0) {
+      throw new Error("observationDelay must be a non-negative number of seconds");
+    }
     this.nextActAt = 0;
 
     if (!Array.isArray(this.deploySequence) || this.deploySequence.some((id) => typeof id !== "string")) {
@@ -156,6 +160,45 @@ export class AutoPolicy {
   }
 }
 
+function captureObservation(engine) {
+  return {
+    time: engine.time,
+    money: Math.floor(engine.money),
+    walletLevel: engine.walletLevel,
+    walletCost: engine.walletCost,
+    cannonCharge: engine.cannonCharge,
+    catCount: engine.catCount,
+    cooldowns: engine.slotCooldowns.slice(),
+    onField: engine.catsOnField(),
+    result: engine.result,
+  };
+}
+
+class ObservedEngine {
+  constructor(engine, state) {
+    this.engine = engine;
+    this.state = state;
+    this.team = engine.team;
+  }
+
+  get time() { return this.state.time; }
+  get money() { return this.state.money; }
+  get walletLevel() { return this.state.walletLevel; }
+  get walletCost() { return this.state.walletCost; }
+  get cannonCharge() { return this.state.cannonCharge; }
+  get catCount() { return this.state.catCount; }
+  get slotCooldowns() { return this.state.cooldowns; }
+  get result() { return this.state.result; }
+
+  catsOnField() {
+    return { ...this.state.onField };
+  }
+
+  deploy(slot) { return this.engine.deploy(slot); }
+  upgradeWallet() { return this.engine.upgradeWallet(); }
+  fireCannon() { return this.engine.fireCannon(); }
+}
+
 export function simulate({
   snapshot,
   team,
@@ -182,10 +225,18 @@ export function simulate({
   });
   const controller = new AutoPolicy(normalizedTeam, policy);
   const hardStop = maxTime == null ? selectedStage.time_limit ?? 1200 : Number(maxTime);
+  const delaySteps = Math.max(0, Math.round(controller.observationDelay / STEP));
+  const observations = [];
 
   while (engine.result === "playing" && engine.time < hardStop) {
+    let view = engine;
+    if (delaySteps > 0) {
+      observations.push(captureObservation(engine));
+      while (observations.length > delaySteps + 1) observations.shift();
+      view = new ObservedEngine(engine, observations[0]);
+    }
     if (engine.time + 1e-9 >= controller.nextActAt) {
-      if (controller.act(engine)) controller.nextActAt = engine.time + controller.actionGap;
+      if (controller.act(view)) controller.nextActAt = engine.time + controller.actionGap;
     }
     engine.step();
   }

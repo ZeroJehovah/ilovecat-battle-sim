@@ -238,6 +238,28 @@ test("actionGap enforces the real page-action interval in simulation", () => {
   }
 });
 
+test("observationDelay models the executor's 10 Hz view", () => {
+  const base = {
+    snapshot,
+    team: [{ id: "c1", level: 1 }],
+    stageId: 9101,
+    maxTime: 1,
+    seed: 1,
+    recordActions: true,
+    policy: {
+      automatic: false,
+      actions: [{ at: 0.05, type: "deploy", id: "c1" }],
+    },
+  };
+  const immediate = simulate(base);
+  const delayed = simulate({
+    ...base,
+    policy: { ...base.policy, observationDelay: 0.1 },
+  });
+  assert.equal(immediate.actionLog[0].at, 0.06);
+  assert.ok(delayed.actionLog[0].at >= 0.15 - 1e-9);
+});
+
 test("world-boss runs report direct boss damage and aggregate its distribution", () => {
   const worldBoss = {
     id: 9001,

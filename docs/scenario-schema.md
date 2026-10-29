@@ -29,6 +29,8 @@
     "fallbackPriority": ["c6", "c2", "c1"],
     "autoCannon": false,
     "automatic": true,
+    "actionGap": 0.25,
+    "observationDelay": 0.1,
     "actions": []
   },
   "maxTime": 900
@@ -48,6 +50,7 @@
 The action loop runs before each 0.02-second battle step and performs at most one world action per step.
 
 - `actionGap`: minimum simulated seconds between successful world actions (default `0`). Use `0.25` to match the browser executor's 250 ms real-time action throttle. With the 0.02-second step the effective interval becomes the next step at or after the gap (0.26 seconds for `0.25`).
+- `observationDelay`: seconds by which the controller's view of the battle lags the live engine (default `0`). Use `0.1` to model the browser executor's roughly 10 Hz React snapshot: money, wallet level/cost, cannon charge, slot cooldowns, field counts, and result are read from the state captured that long ago. Actions still apply to the live engine. This is an observation limit, not a battle-step limit; the engine itself remains fixed at 0.02 seconds.
 - `openers`: cat ids deployed once before the economy phase. Deployment can fail if money or cooldown is insufficient and is retried later.
 - `deploySequence`: optional ordered cat-id list deployed after the wallet target is reached. Repeated ids are allowed. The next entry is strict: if it is unaffordable, cooling down, or unavailable, the policy waits for that exact cat and does not fall through to `priority` or `fallbackPriority` until the sequence is complete.
 - `autoCannon`: with a deploy sequence, a charged cannon may still fire while the policy is waiting for the next fixed unit; the cannon does not spend money or advance the sequence.
@@ -88,7 +91,7 @@ node src/cli.mjs waves --stage-id 9101 --output /tmp/waves.json
 
 `--trace` adds `actionLog` to a single-run JSON result. Each entry uses the original `0.02`-second tick converted to seconds.
 
-Copying that array into `policy.actions` with `automatic: false` reproduces the run under the same source, snapshot, and seed; a tiny clock tolerance prevents decimal `at` values from slipping one frame.
+Copying that array into `policy.actions` with `automatic: false` reproduces the run under the same source, snapshot, seed, `actionGap`, and `observationDelay`. When `observationDelay` is non-zero, an action's logged time is the live engine time; the corresponding view time is earlier by the delay, so a replay scheduled from the log needs that offset (the world-boss and endless replay files use `at = liveAt - 0.1`). A tiny clock tolerance prevents decimal `at` values from slipping one frame.
 
 `--format` accepts `json`, `table`, or `markdown`. An `.md` output path selects Markdown automatically. `--summary-only` removes per-run objects from batch/compare JSON.
 
