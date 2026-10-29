@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         喵喵的逆袭 · 数据导出与策略执行
 // @namespace    https://github.com/ZeroJehovah/ilovecat-battle-sim
-// @version      0.3.9
+// @version      0.3.10
 // @description  按范围只读导出战斗数据与 JS，并按 JSON 策略操作战斗页面；支持空闲自动倍速
 // @match        https://api.ilovecat520.me/*
 // @updateURL    https://raw.githubusercontent.com/ZeroJehovah/ilovecat-battle-sim/main/tools/ilovecat-workbench.user.js
@@ -15,7 +15,7 @@
 
   const STRATEGY_FORMAT = "ilovecat-battle-strategy";
   const EXPORT_FORMAT = "ilovecat-game-export";
-  const USERSCRIPT_VERSION = "0.3.9";
+  const USERSCRIPT_VERSION = "0.3.10";
   const STORAGE_KEY = "ilovecat-workbench-strategy";
   const ACTION_GAP_MS = 250;
   const LOOP_MS = 100;
@@ -142,6 +142,9 @@
           display: flex; align-items: center; gap: 8px; min-height: 32px; margin: 0;
           padding: 0; color: #e7c98f; font-size: 12px; font-weight: 700; line-height: 18px;
         }
+        .fixed-stage-label {
+          display: flex; align-items: center; gap: 7px; white-space: nowrap; cursor: pointer;
+        }
         .fixed-stage-input {
           flex: 1; min-width: 0; height: 30px; border: 1px solid #4e5866; border-radius: 7px;
           background: #0e1218; color: #e8eef6; padding: 4px 8px;
@@ -216,9 +219,9 @@
             <label class="check"><input class="include-catalog" type="checkbox"> 图鉴基础数据（猫、鼠、道具、规则）</label>
             <label class="check"><input class="include-owned" type="checkbox"> 已拥有猫咪的等级列表</label>
             <div class="stage-choices" role="group" aria-label="页面活动关卡"></div>
-            <label class="fixed-stages"><input class="fixed-stage-enable" type="checkbox"> 固定关卡
+            <div class="fixed-stages"><label class="fixed-stage-label"><input class="fixed-stage-enable" type="checkbox"> 固定关卡</label>
               <input class="fixed-stage-input" type="text" autocomplete="off" spellcheck="false" placeholder="关卡 id，例如 1,2,3" aria-label="固定关卡 id，例如 1,2,3">
-            </label>
+            </div>
             <div class="js-scope-row" role="radiogroup" aria-label="JS 源码">
               <label class="check"><input class="js-enable" type="checkbox"> JS源码</label>
               <label class="check radio"><input class="js-scope" type="radio" name="export-js-scope" value="battle"> 战斗逻辑</label>

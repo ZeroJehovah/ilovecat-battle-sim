@@ -23,7 +23,7 @@ test("the userscript is syntactically valid and exposes both workflows", () => {
   assert.doesNotThrow(() => new Function(source));
   assert.match(source, /@match\s+https:\/\/api\.ilovecat520\.me\/\*/);
   assert.match(source, /@updateURL\s+https:\/\/raw\.githubusercontent\.com\/ZeroJehovah\/ilovecat-battle-sim\/main\/tools\/ilovecat-workbench\.user\.js/);
-  assert.match(source, /USERSCRIPT_VERSION = "0\.3\.9"/);
+  assert.match(source, /USERSCRIPT_VERSION = "0\.3\.10"/);
   assert.match(source, /<div class="title">喵喵的逆袭工具 <span class="version">v\$\{USERSCRIPT_VERSION\}<\/span><\/div>/);
   assert.match(source, /ilovecat-game-export/);
   assert.match(source, /ilovecat-battle-strategy/);
@@ -92,6 +92,8 @@ test("the userscript is syntactically valid and exposes both workflows", () => {
   assert.match(source, /daily-master/);
   assert.match(source, /daily-difficulty-input/);
   assert.match(source, /fixed-stage-enable/);
+  assert.match(source, /<div class="fixed-stages"><label class="fixed-stage-label"><input class="fixed-stage-enable" type="checkbox"> 固定关卡<\/label>/);
+  assert.doesNotMatch(source, /<label class="fixed-stages">/);
   assert.match(source, /fixed-stage-input/);
   assert.match(source, /placeholder="关卡 id，例如 1,2,3"/);
   assert.match(source, /js-enable/);
