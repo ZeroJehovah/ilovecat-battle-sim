@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         喵喵的逆袭 · 数据导出与策略执行
 // @namespace    https://github.com/ZeroJehovah/ilovecat-battle-sim
-// @version      0.5.0
+// @version      0.5.1
 // @description  按范围只读导出战斗数据与 JS，并从在线索引或本地文件选择策略操作战斗页面
 // @match        https://api.ilovecat520.me/*
 // @updateURL    https://raw.githubusercontent.com/ZeroJehovah/ilovecat-battle-sim/main/tools/ilovecat-workbench.user.js
@@ -18,7 +18,7 @@
 
   const STRATEGY_FORMAT = "ilovecat-battle-strategy";
   const EXPORT_FORMAT = "ilovecat-game-export";
-  const USERSCRIPT_VERSION = "0.5.0";
+  const USERSCRIPT_VERSION = "0.5.1";
   const STRATEGY_INDEX_URL = "https://github.com/ZeroJehovah/ilovecat-battle-sim-docs/raw/main/strategies/index.json";
   const STRATEGY_INDEX_TTL_MS = 5 * 60 * 1000;
   const ACTION_GAP_MS = 250;
@@ -37,6 +37,22 @@
     cannon_ready: "貓爪砲預熱",
     rally: "全軍振奮",
   };
+  /*
+   * Lucide "refresh-cw" icon: https://lucide.dev/icons/refresh-cw
+   * Copyright (c) 2026 Lucide Icons and Contributors
+   * ISC License
+   * Permission to use, copy, modify, and/or distribute this software for any
+   * purpose with or without fee is hereby granted, provided that the above
+   * copyright notice and this permission notice appear in all copies.
+   * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+   * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+   * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+   * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+   * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+   * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+   * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+   */
+  const REFRESH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>';
 
   const pageWindow = typeof unsafeWindow === "undefined" ? window : unsafeWindow;
   const pageDocument = pageWindow.document;
@@ -46,6 +62,7 @@
   let stageOptions = null;
   let stageOptionsPromise = null;
   let activeStrategyText = "";
+  let activeStrategyCats = new Map();
   let currentTab = "export";
   let selectedOnlineStrategyId = "";
   let selectedOnlineStageId = "";
@@ -129,18 +146,17 @@
           display: flex; align-items: center; justify-content: space-between; gap: 10px;
         }
         .strategy-source-title { color: #f0b95c; font-size: 13px; font-weight: 700; }
-        .refresh-strategies {
-          border: 1px solid #5e513d; border-radius: 8px; background: #282f3a;
-          color: #f7ead0; padding: 4px 8px; cursor: pointer; font-size: 11px;
-        }
-        .stage-filter-block { display: flex; flex-direction: column; gap: 5px; }
-        .stage-filter-label { color: #b9ad98; font-size: 11px; }
         .online-stage-filters { display: flex; flex-wrap: wrap; gap: 6px; }
-        .online-stage-filter {
+        .online-stage-filter, .refresh-strategies {
           border: 1px solid #4d5868; border-radius: 999px; background: #171e27;
           color: #d8cdb9; padding: 3px 9px; cursor: pointer; font-size: 11px;
-          line-height: 18px;
+          line-height: 18px; min-height: 26px;
         }
+        .refresh-strategies {
+          flex: 0 0 30px; display: grid; place-items: center;
+          width: 30px; height: 26px; padding: 3px;
+        }
+        .refresh-strategies svg { display: block; }
         .online-stage-filter.selected {
           border-color: #f0b95c; background: #3a2c18; color: #ffe0a3;
           font-weight: 700;
@@ -171,6 +187,7 @@
           border-top: 1px solid #4b402d;
         }
         .online-strategy-meta { color: #b9ad98; font-size: 11px; line-height: 1.45; }
+        .online-strategy-team { display: flex; flex-wrap: wrap; gap: 0 8px; }
         .online-strategy-description { color: #d8cdb9; font-size: 11px; line-height: 1.55; }
         .online-strategy-empty {
           padding: 9px 10px; border: 1px dashed #3e4857; border-radius: 9px;
@@ -181,7 +198,7 @@
           flex: 0 0 auto; border: 1px solid #5e513d; border-radius: 9px;
           background: #282f3a; color: #f7ead0; padding: 6px 9px; cursor: pointer;
         }
-        .strategy-origin, .active-strategy-origin {
+        .strategy-origin {
           min-width: 0; color: #e7c98f; font-size: 11px; line-height: 1.4;
           overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
         }
@@ -193,9 +210,6 @@
           border-radius: 11px; background: #11161d;
         }
         .execution-panel[hidden] { display: none !important; }
-        .active-strategy-origin {
-          padding-bottom: 7px; border-bottom: 1px solid #313946;
-        }
         .warning { color: #f4ca7c; }
         .scope-card {
           display: flex; flex-direction: column; gap: 6px;
@@ -327,15 +341,9 @@
         </div>
         <div class="view" data-view="online" hidden>
           <div class="strategy-source">
-            <div class="strategy-source-head">
-              <span class="strategy-source-title">在线策略</span>
-              <button class="refresh-strategies" type="button">刷新</button>
-            </div>
-            <div class="stage-filter-block">
-              <span class="stage-filter-label">按关卡筛选</span>
-              <div class="online-stage-filters" role="tablist" aria-label="在线策略关卡筛选">
-                <span class="online-stage-empty">加载后显示支持的关卡</span>
-              </div>
+            <div class="online-stage-filters" role="group" aria-label="在线策略关卡筛选">
+              <button class="refresh-strategies" type="button" title="刷新策略" aria-label="刷新策略">${REFRESH_ICON_SVG}</button>
+              <span class="online-stage-empty">加载后显示支持的关卡</span>
             </div>
             <div class="online-strategies" role="listbox" aria-label="在线策略列表">
               <div class="online-strategy-empty">打开此页后自动加载，请稍候。</div>
@@ -357,10 +365,9 @@
           </div>
         </div>
         <div class="execution-panel" hidden>
-          <div class="active-strategy-origin">当前策略：未选择</div>
           <div class="execute-options">
-            <label class="check warning"><input class="auto-start" type="checkbox"> 自动开始战斗</label>
-            <label class="check"><input class="auto-speed" type="checkbox"> 自动倍速</label>
+            <label class="check warning"><input class="auto-start" type="checkbox" checked> 自动开始战斗</label>
+            <label class="check"><input class="auto-speed" type="checkbox" checked> 自动倍速</label>
           </div>
           <p class="item-warning" hidden></p>
           <div class="actions">
@@ -400,7 +407,6 @@
       onlineIndexStatus: root.querySelector(".online-index-status"),
       refreshStrategies: root.querySelector(".refresh-strategies"),
       localFileStatus: root.querySelector(".local-file-status"),
-      activeStrategyOrigin: root.querySelector(".active-strategy-origin"),
       executionPanel: root.querySelector(".execution-panel"),
       autoStart: root.querySelector(".auto-start"),
       autoSpeed: root.querySelector(".auto-speed"),
@@ -504,9 +510,9 @@
         if (file.size > 2 * 1024 * 1024) throw new Error("策略文件超过 2 MiB，已拒绝读取。");
         const text = await file.text();
         parseStrategy(text);
-        setActiveStrategy(text, `本地 · ${file.name}`);
-        ui.localFileStatus.textContent = `已选择 ${file.name}`;
-        setRunStatus(`已载入本地文件 ${file.name}，正在自动校验。`);
+        setActiveStrategy(text);
+        ui.localFileStatus.textContent = file.name;
+        setRunStatus("本地策略已载入，正在自动校验。");
         await validateFromUi();
       } catch (error) {
         ui.localFileStatus.textContent = "本地文件读取或校验失败";
@@ -581,11 +587,10 @@
     ui.stop.disabled = !executor;
   }
 
-  function setActiveStrategy(text, label, onlineId = "") {
+  function setActiveStrategy(text, onlineId = "") {
     activeStrategyText = text;
+    activeStrategyCats = new Map();
     selectedOnlineStrategyId = onlineId;
-    ui.activeStrategyOrigin.textContent = `当前策略：${label}`;
-    ui.activeStrategyOrigin.title = label;
     if (onlineId) {
       ui.localFileStatus.textContent = "未选择文件";
       ui.localFileStatus.removeAttribute("title");
@@ -603,9 +608,8 @@
 
   function clearActiveStrategy(message = "", error = false) {
     activeStrategyText = "";
+    activeStrategyCats = new Map();
     selectedOnlineStrategyId = "";
-    ui.activeStrategyOrigin.textContent = "当前策略：未选择";
-    ui.activeStrategyOrigin.removeAttribute("title");
     clearStrategySummary();
     ui.itemWarning.hidden = true;
     ui.itemWarning.textContent = "";
@@ -632,6 +636,7 @@
 
   function renderOnlineStageFilters(stages) {
     const fragment = document.createDocumentFragment();
+    const refresh = ui.onlineStageFilters.querySelector(".refresh-strategies");
     if (!stages.length) {
       const empty = document.createElement("span");
       empty.className = "online-stage-empty";
@@ -643,14 +648,13 @@
       button.type = "button";
       button.className = "online-stage-filter";
       button.dataset.stageId = String(stage.id);
-      button.setAttribute("role", "tab");
       const selected = String(stage.id) === selectedOnlineStageId;
       button.classList.toggle("selected", selected);
-      button.setAttribute("aria-selected", String(selected));
+      button.setAttribute("aria-pressed", String(selected));
       button.textContent = `${stage.name} · ${stage.id} (${stage.count})`;
       fragment.append(button);
     }
-    ui.onlineStageFilters.replaceChildren(fragment);
+    ui.onlineStageFilters.replaceChildren(refresh, fragment);
   }
 
   function renderOnlineStrategies() {
@@ -689,16 +693,17 @@
       if (selected) {
         const details = document.createElement("span");
         details.className = "online-strategy-details";
-        const stage = document.createElement("span");
-        stage.className = "online-strategy-meta";
-        stage.textContent = `关卡 ${entry.stage.name}（id ${entry.stage.id}）`;
         const team = document.createElement("span");
-        team.className = "online-strategy-meta";
-        team.textContent = entry.team.map((cat) => `${cat.name} Lv.${cat.level}`).join("、");
+        team.className = "online-strategy-meta online-strategy-team";
+        renderCatTeam(team, entry.team.map((cat) => ({
+          name: cat.name,
+          level: cat.level,
+          tier: activeStrategyCats.get(String(cat.id))?.tier ?? cat.tier ?? "",
+        })));
         const description = document.createElement("span");
         description.className = "online-strategy-description";
         description.textContent = entry.description;
-        details.append(stage, team, description);
+        details.append(team, description);
         button.append(details);
       }
       fragment.append(button);
@@ -774,10 +779,11 @@
       const text = await requestRemoteText(entry.rawUrl);
       const strategy = parseStrategy(text);
       validateIndexedStrategy(index, entry, strategy);
-      setActiveStrategy(text, `在线 · ${entry.title}`, entry.id);
+      setActiveStrategy(text, entry.id);
       renderOnlineStrategies();
-      setOnlineStatus(`已选择「${entry.title}」。`);
       await validateFromUi();
+      renderOnlineStrategies();
+      setOnlineStatus("策略已自动校验。");
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       setOnlineStatus(`策略载入失败：${message}`, true);
@@ -818,9 +824,14 @@
   function renderStrategySummary(summary) {
     ui.summaryName.textContent = summary.name;
     ui.summaryStage.textContent = summary.stage;
-    ui.summaryTeam.replaceChildren();
-    summary.team.forEach((cat, index) => {
-      if (index) ui.summaryTeam.append("、");
+    renderCatTeam(ui.summaryTeam, summary.team, "、");
+  }
+
+  function renderCatTeam(target, cats, separator = "") {
+    const ordered = sortCatsByTier(cats);
+    target.replaceChildren();
+    ordered.forEach((cat, index) => {
+      if (index && separator) target.append(separator);
       const entry = document.createElement("span");
       entry.className = "strategy-cat";
       const name = document.createElement("span");
@@ -832,8 +843,21 @@
       name.textContent = cat.name;
       level.textContent = "(" + cat.level + ")";
       entry.append(name, level);
-      ui.summaryTeam.append(entry);
+      target.append(entry);
     });
+  }
+
+  function sortCatsByTier(cats) {
+    const tierOrder = ["C", "B", "A", "S"];
+    return (Array.isArray(cats) ? cats : [])
+      .map((cat, index) => ({ cat, index }))
+      .sort((left, right) => {
+        const leftRank = tierOrder.indexOf(String(left.cat?.tier ?? "").toUpperCase());
+        const rightRank = tierOrder.indexOf(String(right.cat?.tier ?? "").toUpperCase());
+        return (leftRank < 0 ? tierOrder.length : leftRank) - (rightRank < 0 ? tierOrder.length : rightRank)
+          || left.index - right.index;
+      })
+      .map(({ cat }) => cat);
   }
 
   async function apiGet(name) {
@@ -1636,6 +1660,7 @@
     const active = isActiveRuntime(runtime) ? runtime : { context: null, snapshot: null };
     const prep = active.context ? null : findPreparationRuntime(strategy);
     const display = await resolveStrategyDisplay(strategy, active, prep);
+    activeStrategyCats = display.cats;
     renderStrategySummary(buildStrategySummary(strategy, display.stageName, display.cats));
     const results = buildUiValidationResults(strategy, active, prep, display.cats, ITEM_NAMES);
     setValidationResults(results);
@@ -1703,7 +1728,7 @@
     return {
       name: String(strategy.name ?? "").trim(),
       stage: String(stageName ?? "").trim(),
-      team: team.map(resolveCat).filter(Boolean),
+      team: sortCatsByTier(team.map(resolveCat).filter(Boolean)),
     };
   }
   // end testable:buildStrategySummary
