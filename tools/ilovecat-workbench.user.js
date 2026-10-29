@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         喵喵的逆袭 · 数据导出与策略执行
 // @namespace    https://github.com/ZeroJehovah/ilovecat-battle-sim
-// @version      0.3.5
+// @version      0.3.6
 // @description  按范围只读导出战斗数据与 JS，并按 JSON 策略操作战斗页面；支持空闲自动倍速
 // @match        https://api.ilovecat520.me/*
 // @updateURL    https://raw.githubusercontent.com/ZeroJehovah/ilovecat-battle-sim/main/tools/ilovecat-workbench.user.js
@@ -15,7 +15,7 @@
 
   const STRATEGY_FORMAT = "ilovecat-battle-strategy";
   const EXPORT_FORMAT = "ilovecat-game-export";
-  const USERSCRIPT_VERSION = "0.3.5";
+  const USERSCRIPT_VERSION = "0.3.6";
   const STORAGE_KEY = "ilovecat-workbench-strategy";
   const ACTION_GAP_MS = 250;
   const LOOP_MS = 100;
@@ -112,14 +112,18 @@
         input[type="file"][hidden] { display: none !important; }
         .warning { color: #f4ca7c; }
         .scope-card {
+          display: flex; flex-direction: column; gap: 6px;
           margin: 10px 0; padding: 10px; border: 1px solid #3e4857;
           border-radius: 11px; background: #11161d;
         }
-        .scope-card label.check { margin: 6px 0; }
+        .scope-card label.check {
+          min-height: 26px; margin: 0; padding: 3px 0;
+          font-size: 12px; line-height: 1.35;
+        }
         .scope-card label.radio { line-height: 1.4; }
-        .stage-choices { margin: 5px 0 2px; }
+        .stage-choices { display: flex; flex-direction: column; gap: 6px; margin: 0; }
         .stage-option, .daily-stage-row {
-          display: flex; align-items: center; gap: 7px; padding: 4px 0;
+          display: flex; align-items: center; gap: 7px; min-height: 26px; padding: 3px 0;
           border-radius: 6px; font-size: 12px; line-height: 1.35;
         }
         .stage-option { cursor: pointer; }
@@ -130,18 +134,23 @@
         }
         .stage-kind { color: #f0b95c; font-weight: 700; }
         .fixed-stages {
-          display: flex; align-items: center; gap: 8px; margin: 7px 0 4px;
-          color: #e7c98f; font-size: 12px; font-weight: 700;
+          display: flex; align-items: center; gap: 8px; min-height: 26px; margin: 0;
+          padding: 3px 0; color: #e7c98f; font-size: 12px; font-weight: 700; line-height: 1.35;
         }
         .fixed-stage-input {
-          flex: 1; min-width: 0; border: 1px solid #4e5866; border-radius: 7px;
-          background: #0e1218; color: #e8eef6; padding: 5px 8px; font-size: 12px;
+          flex: 1; min-width: 0; height: 20px; border: 1px solid #4e5866; border-radius: 7px;
+          background: #0e1218; color: #e8eef6; padding: 1px 8px;
+          font-size: 12px; line-height: 16px;
         }
         .js-scope-row {
-          display: flex; align-items: center; gap: 10px; margin-top: 9px;
-          color: #e7c98f; font-size: 12px; font-weight: 700; white-space: nowrap;
+          display: flex; align-items: center; gap: 10px; min-height: 26px; margin: 0;
+          padding: 3px 0; color: #e7c98f; font-size: 12px; font-weight: 700;
+          line-height: 1.35; white-space: nowrap;
         }
-        .js-scope-row label.check { margin: 0; color: #f7ead0; font-weight: 400; }
+        .js-scope-row label.check {
+          min-height: 0; margin: 0; padding: 0;
+          color: #f7ead0; font-weight: 400;
+        }
         .execute-options { display: flex; align-items: center; gap: 18px; margin: 10px 0; white-space: nowrap; }
         .execute-options label.check { margin: 0; }
         .item-warning {
@@ -150,6 +159,25 @@
           font-size: 12px; line-height: 1.5;
         }
         .item-warning[hidden] { display: none !important; }
+        .strategy-summary {
+          margin-top: 10px; padding: 8px 10px; border: 1px solid #313946;
+          border-radius: 9px; background: #10141a; color: #f7ead0;
+          font: 12px/1.65 ui-monospace, SFMono-Regular, Consolas, monospace;
+        }
+        .strategy-summary-row { display: flex; gap: 4px; min-height: 20px; }
+        .strategy-summary-label, .strategy-summary-value { color: #f7ead0; }
+        .strategy-summary-value { min-width: 0; overflow-wrap: anywhere; }
+        .strategy-summary-team { flex: 1; }
+        .strategy-cat-name { color: #f7ead0; }
+        .strategy-cat-name.tier-c { color: #b9c1cc; }
+        .strategy-cat-name.tier-b { color: #68c7ff; font-weight: 700; }
+        .strategy-cat-name.tier-a { color: #d69bff; font-weight: 700; }
+        .strategy-cat-name.tier-s { color: #ffbf47; font-weight: 700; }
+        .strategy-cat-level { color: #f7ead0; }
+        .validation-line { display: block; }
+        .validation-line.success { color: #b8e7c0; }
+        .validation-line.warning { color: #f4ca7c; }
+        .validation-line.error { color: #ffaaa4; }
         .copy-fallback[hidden] { display: none !important; }
         .copy-fallback { margin-top: 10px; }
         .copy-fallback textarea { min-height: 150px; }
@@ -216,7 +244,12 @@
             <button class="primary run">开始执行</button>
             <button class="danger stop">停止</button>
           </div>
-          <pre class="status run-status">未执行。</pre>
+          <div class="strategy-summary" aria-label="策略信息">
+            <div class="strategy-summary-row"><span class="strategy-summary-label">策略名称：</span><span class="strategy-summary-name strategy-summary-value"></span></div>
+            <div class="strategy-summary-row"><span class="strategy-summary-label">适用关卡：</span><span class="strategy-summary-stage strategy-summary-value"></span></div>
+            <div class="strategy-summary-row"><span class="strategy-summary-label">策略配队：</span><span class="strategy-summary-team strategy-summary-value"></span></div>
+          </div>
+          <div class="status run-status" aria-live="polite">尚未校验。</div>
         </div>
       </section>`;
     return {
@@ -247,6 +280,9 @@
       validate: root.querySelector(".validate"),
       run: root.querySelector(".run"),
       stop: root.querySelector(".stop"),
+      summaryName: root.querySelector(".strategy-summary-name"),
+      summaryStage: root.querySelector(".strategy-summary-stage"),
+      summaryTeam: root.querySelector(".strategy-summary-team"),
       runStatus: root.querySelector(".run-status"),
     };
   }
@@ -310,6 +346,11 @@
       updateExportControls();
     });
     ui.validate.addEventListener("click", () => runBusy(() => validateFromUi()));
+    ui.strategy.addEventListener("input", () => {
+      if (busy || executor) return;
+      clearStrategySummary();
+      setRunStatus("尚未校验。");
+    });
     ui.loadStrategy.addEventListener("click", () => ui.strategyFile.click());
     ui.strategyFile.addEventListener("change", () => runBusy(async () => {
       const file = ui.strategyFile.files?.[0];
@@ -317,6 +358,7 @@
       const text = await file.text();
       ui.strategy.value = text;
       saveStorage(text);
+      clearStrategySummary();
       setRunStatus(`已载入 ${file.name}（${text.length} 个字符）。请点击“校验”。`);
       ui.strategyFile.value = "";
     }));
@@ -367,6 +409,46 @@
     ui.runStatus.textContent = message;
     ui.runStatus.classList.toggle("error", error);
     ui.runStatus.classList.toggle("ok", !error && !message.startsWith("运行中"));
+  }
+
+  function setValidationResults(results) {
+    ui.runStatus.classList.remove("error", "ok");
+    const labels = { success: "成功", warning: "警告", error: "错误" };
+    const fragment = document.createDocumentFragment();
+    for (const result of results) {
+      const line = document.createElement("div");
+      line.className = `validation-line ${result.type}`;
+      line.textContent = `（${labels[result.type] || "信息"}）${result.text}`;
+      fragment.append(line);
+    }
+    ui.runStatus.replaceChildren(fragment);
+  }
+
+  function clearStrategySummary() {
+    ui.summaryName.textContent = "";
+    ui.summaryStage.textContent = "";
+    ui.summaryTeam.replaceChildren();
+  }
+
+  function renderStrategySummary(summary) {
+    ui.summaryName.textContent = summary.name;
+    ui.summaryStage.textContent = summary.stage;
+    ui.summaryTeam.replaceChildren();
+    summary.team.forEach((cat, index) => {
+      if (index) ui.summaryTeam.append("、");
+      const entry = document.createElement("span");
+      entry.className = "strategy-cat";
+      const name = document.createElement("span");
+      name.className = "strategy-cat-name";
+      const level = document.createElement("span");
+      level.className = "strategy-cat-level";
+      const tier = String(cat.tier || "").toLowerCase();
+      if (["c", "b", "a", "s"].includes(tier)) name.classList.add("tier-" + tier);
+      name.textContent = cat.name;
+      level.textContent = "(" + cat.level + ")";
+      entry.append(name, level);
+      ui.summaryTeam.append(entry);
+    });
   }
 
   async function apiGet(name) {
@@ -1001,29 +1083,25 @@
   }
 
   async function validateFromUi() {
-    const strategy = parseStrategy(ui.strategy.value);
+    clearStrategySummary();
+    let strategy;
+    try {
+      strategy = parseStrategy(ui.strategy.value);
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      setValidationResults([{ type: "error", text: `JSON 解析失败：${detail}` }]);
+      return null;
+    }
     saveStorage(ui.strategy.value);
+    setValidationResults([{ type: "success", text: "JSON 解析成功。" }]);
     const runtime = findBattleRuntime();
     const active = isActiveRuntime(runtime) ? runtime : { context: null, snapshot: null };
     const prep = active.context ? null : findPreparationRuntime(strategy);
     const display = await resolveStrategyDisplay(strategy, active, prep);
-    const messages = validateStrategy(strategy, active, display.names);
-    if (!active.context) {
-      if (prep) messages.push(...validatePreparation(strategy, prep));
-      else messages.push("提示：没有找到可用的“出战”准备界面（按策略关卡 id/名称匹配）。");
-    }
+    renderStrategySummary(buildStrategySummary(strategy, display.stageName, display.cats));
+    const results = buildUiValidationResults(strategy, active, prep, display.cats, ITEM_NAMES);
+    setValidationResults(results);
     updateItemWarning(strategy, prep, Boolean(active.context));
-    const hasError = messages.some((line) => line.startsWith("错误"));
-    if (hasError) {
-      setRunStatus(messages.join("\n"), true);
-    } else {
-      const notes = messages.filter((line) => /^(?:警告|提示)：/.test(line));
-      setRunStatus([
-        buildStrategySummary(strategy, display.stageName, display.names),
-        ...notes,
-        "校验通过。",
-      ].join("\n"));
-    }
     return strategy;
   }
 
@@ -1040,7 +1118,13 @@
   }
 
   async function resolveStrategyDisplay(strategy, active, prep) {
-    const names = namesForStrategy(strategy, active, prep);
+    const cats = new Map();
+    for (const entry of prep?.team ?? []) {
+      cats.set(entry.id, { name: String(entry.name ?? ""), tier: String(entry.tier ?? "") });
+    }
+    for (const entry of active?.context?.team ?? []) {
+      cats.set(entry.id, { name: String(entry.name ?? ""), tier: String(entry.tier ?? "") });
+    }
     let catalog = stageOptions?.catalog;
     let entries = stageOptions?.entries;
     if (!catalog || !entries) {
@@ -1052,7 +1136,9 @@
         entries = [];
       }
     }
-    for (const cat of catalog?.cats ?? []) names.set(String(cat.id), String(cat.name ?? cat.id));
+    for (const cat of catalog?.cats ?? []) {
+      cats.set(String(cat.id), { name: String(cat.name ?? ""), tier: String(cat.tier ?? "") });
+    }
     const matchingStage = strategy.stageId == null
       ? null
       : entries?.find((entry) => Number(entry.stage.id) === Number(strategy.stageId));
@@ -1060,24 +1146,153 @@
       || matchingStage?.stage.name
       || prep?.stage?.name
       || active?.context?.stageName
-      || (strategy.stageId == null ? "未指定" : "未知关卡");
-    return { names, stageName };
+      || "";
+    return { cats, stageName };
   }
 
   // testable:buildStrategySummary
-  function buildStrategySummary(strategy, stageName, names = new Map()) {
+  function buildStrategySummary(strategy, stageName, cats = new Map()) {
     const team = Array.isArray(strategy.team) ? strategy.team : [];
-    const roster = team.map((entry) => {
-      const name = names.get(String(entry.id)) || "未知猫咪";
-      return `${name} Lv.${entry.level}`;
-    }).join("；");
-    return [
-      `策略名称：${strategy.name || "未命名"}`,
-      `适用关卡：${stageName || "未知关卡"}`,
-      `策略队伍：${roster || "未指定"}`,
-    ].join("\n");
+    const resolveCat = (entry) => {
+      const cat = cats.get(String(entry.id));
+      const name = typeof cat === "string" ? cat : cat?.name;
+      return name ? {
+        name: String(name),
+        level: Number(entry.level),
+        tier: typeof cat === "string" ? "" : String(cat?.tier ?? ""),
+      } : null;
+    };
+    return {
+      name: String(strategy.name ?? "").trim(),
+      stage: String(stageName ?? "").trim(),
+      team: team.map(resolveCat).filter(Boolean),
+    };
   }
   // end testable:buildStrategySummary
+
+  // testable:buildUiValidationResults
+  function buildUiValidationResults(strategy, active, prep, cats = new Map(), itemLabels = {}) {
+    const results = [{ type: "success", text: "JSON 解析成功。" }];
+    const team = Array.isArray(strategy.team) ? strategy.team : [];
+    const levels = new Map(team.map((entry) => [String(entry.id), Number(entry.level)]));
+    const policy = strategy.policy ?? {};
+    const referenced = new Set(team.map((entry) => String(entry.id)));
+    for (const key of ["openers", "priority", "fallbackPriority", "deploySequence"]) {
+      for (const id of Array.isArray(policy[key]) ? policy[key] : []) referenced.add(String(id));
+    }
+    for (const id of Object.keys(policy.targetCounts ?? {})) referenced.add(String(id));
+    for (const action of Array.isArray(policy.actions) ? policy.actions : []) {
+      if (action?.id) referenced.add(String(action.id));
+    }
+    const catName = (id) => {
+      const cat = cats.get(String(id));
+      const name = typeof cat === "string" ? cat : cat?.name;
+      return name ? String(name) : "";
+    };
+    const describeCat = (id) => {
+      const name = catName(id);
+      const level = levels.get(String(id));
+      return name ? (Number.isFinite(level) ? name + "(" + level + ")" : name) : "";
+    };
+    const itemName = (id) => itemLabels[id] || String(id);
+    const stageResults = () => {
+      if (active?.context) {
+        const expectedId = strategy.stageId;
+        const actualId = active.context.stageId;
+        if (expectedId != null && Number(expectedId) !== Number(actualId)) {
+          const expected = strategy.stage?.name || "id " + expectedId;
+          const actual = active.context.stageName || "id " + actualId;
+          return [{ type: "error", text: "关卡不符：策略为「" + expected + "」，当前为「" + actual + "」。" }];
+        }
+        return [{ type: "success", text: "关卡匹配。" }];
+      }
+      if (prep?.stageMatch === false) {
+        const expected = strategy.stage?.name || "id " + strategy.stageId;
+        const actual = prep.stage?.name || prep.title || "";
+        return [{ type: "error", text: "关卡不符：策略为「" + expected + "」，当前为「" + actual + "」。" }];
+      }
+      return [{ type: "success", text: "关卡匹配。" }];
+    };
+    const teamResults = (actualTeam) => {
+      const actual = new Map((actualTeam ?? []).map((entry) => [String(entry.id), entry]));
+      const missing = [...referenced].filter((id) => !actual.has(id));
+      const output = [];
+      if (missing.length) {
+        const names = missing.map((id) => describeCat(id) || "未知猫咪");
+        output.push({ type: "error", text: "配队不符：当前编队缺少 " + names.join("、") + "。" });
+      } else if (referenced.size) {
+        output.push({ type: "success", text: "配队匹配。" });
+      } else {
+        output.push({ type: "success", text: "策略未限定配队。" });
+      }
+      const levelMismatch = team.filter((entry) => {
+        return actual.has(String(entry.id)) && Number(actual.get(String(entry.id)).level) !== Number(entry.level);
+      });
+      if (levelMismatch.length) {
+        const details = levelMismatch.map((entry) => {
+          const name = catName(entry.id) || "未知猫咪";
+          return name + " 策略 " + entry.level + "，当前 " + actual.get(String(entry.id)).level;
+        });
+        output.push({ type: "warning", text: "等级不符：" + details.join("；") + "。" });
+      }
+      return output;
+    };
+    const battleItemResults = () => {
+      const expected = new Set((Array.isArray(strategy.items) ? strategy.items : []).map(String));
+      const actual = new Set((active?.context?.items ?? []).map((item) => {
+        return typeof item === "string" ? item : String(item?.id ?? "");
+      }).filter(Boolean));
+      const missing = [...expected].filter((id) => !actual.has(id));
+      if (missing.length) {
+        return [{ type: "error", text: "道具不足：当前战斗未携带 " + missing.map(itemName).join("、") + "。" }];
+      }
+      const extra = [...actual].filter((id) => !expected.has(id));
+      if (extra.length) {
+        return [{ type: "warning", text: "额外道具：" + extra.map(itemName).join("、") + "。" }];
+      }
+      return [{ type: "success", text: expected.size ? "道具匹配。" : "无需消耗品。" }];
+    };
+    const preparationItemResults = () => {
+      const expected = new Set((Array.isArray(strategy.items) ? strategy.items : []).map(String));
+      const entries = new Map((prep?.items ?? []).map((item) => [String(item.id), item]));
+      const unavailable = [...expected].filter((id) => {
+        const item = entries.get(id);
+        return !item || Number(item.count) <= 0;
+      });
+      if (unavailable.length) {
+        return [{ type: "error", text: "道具不足：" + unavailable.map(itemName).join("、") + "。" }];
+      }
+      const selected = new Set([...entries.values()]
+        .filter((item) => item.selected)
+        .map((item) => String(item.id)));
+      const missingSelected = [...expected].filter((id) => !selected.has(id));
+      const extraSelected = [...selected].filter((id) => !expected.has(id));
+      const changes = [];
+      if (missingSelected.length) changes.push("未勾选 " + missingSelected.map(itemName).join("、"));
+      if (extraSelected.length) changes.push("多选 " + extraSelected.map(itemName).join("、"));
+      if (changes.length) {
+        return [{ type: "warning", text: "道具待调整：" + changes.join("；") + "；开始执行时会自动处理。" }];
+      }
+      return [{ type: "success", text: expected.size ? "道具充足且已勾选。" : "无需消耗品。" }];
+    };
+    if (active?.context) {
+      results.push(...stageResults());
+      results.push(...teamResults(active.context.team));
+      results.push(...battleItemResults());
+    } else if (prep) {
+      results.push(...stageResults());
+      results.push(...teamResults(prep.team));
+      results.push(...preparationItemResults());
+    } else {
+      results.push({ type: "warning", text: "当前未处于战斗准备界面。" });
+      return results;
+    }
+    if (!results.some((result) => result.type === "error")) {
+      results.push({ type: "success", text: "校验通过。" });
+    }
+    return results;
+  }
+  // end testable:buildUiValidationResults
 
   function validateStrategy(strategy, runtime, names = null) {
     const messages = [`策略：${strategy.name || "未命名"}`];
@@ -1212,6 +1427,7 @@
         slot,
         id: key,
         name: String(cat?.name ?? key),
+        tier: String(cat?.tier ?? ""),
         level: Number(unit?.level ?? 1),
       };
     });
@@ -2029,6 +2245,7 @@
                 slot,
                 id: String(cat.id ?? entry?.id ?? ""),
                 name: String(cat.name ?? cat.id ?? entry?.id ?? ""),
+                tier: String(cat.tier ?? ""),
                 cost: Number(cat.cost ?? 0),
                 cooldown: Number(cat.cooldown ?? 0),
                 level: Number(entry?.level ?? 1),

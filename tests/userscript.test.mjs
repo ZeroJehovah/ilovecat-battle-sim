@@ -23,7 +23,7 @@ test("the userscript is syntactically valid and exposes both workflows", () => {
   assert.doesNotThrow(() => new Function(source));
   assert.match(source, /@match\s+https:\/\/api\.ilovecat520\.me\/\*/);
   assert.match(source, /@updateURL\s+https:\/\/raw\.githubusercontent\.com\/ZeroJehovah\/ilovecat-battle-sim\/main\/tools\/ilovecat-workbench\.user\.js/);
-  assert.match(source, /USERSCRIPT_VERSION = "0\.3\.5"/);
+  assert.match(source, /USERSCRIPT_VERSION = "0\.3\.6"/);
   assert.match(source, /<div class="title">喵喵的逆袭工具 <span class="version">v\$\{USERSCRIPT_VERSION\}<\/span><\/div>/);
   assert.match(source, /ilovecat-game-export/);
   assert.match(source, /ilovecat-battle-strategy/);
@@ -49,7 +49,13 @@ test("the userscript is syntactically valid and exposes both workflows", () => {
   assert.match(source, /prep = await selectPreparationItems\(strategy, prep\)/);
   assert.match(source, /updateItemWarning/);
   assert.match(source, /buildStrategySummary/);
+  assert.match(source, /buildUiValidationResults/);
   assert.match(source, /适用关卡：/);
+  assert.match(source, /策略配队：/);
+  assert.match(source, /validation-line\.success/);
+  assert.match(source, /strategy-cat-name\.tier-s/);
+  assert.match(source, /strategy-cat-level \{ color: #f7ead0; \}/);
+  assert.match(source, /当前未处于战斗准备界面/);
   assert.doesNotMatch(source, /出战顺序/);
   assert.match(source, /matchesStageTitle/);
   assert.match(source, /readStageFromFiber/);
@@ -75,6 +81,8 @@ test("the userscript is syntactically valid and exposes both workflows", () => {
   assert.match(source, /include-owned/);
   assert.doesNotMatch(source, /include-team|include-inventory/);
   assert.match(source, /stage-choices/);
+  assert.match(source, /\.scope-card \{[\s\S]*?display: flex; flex-direction: column; gap: 6px;/);
+  assert.match(source, /\.stage-option, \.daily-stage-row \{[\s\S]*?min-height: 26px; padding: 3px 0;/);
   assert.match(source, /当前无尽/);
   assert.match(source, /每日任务/);
   assert.match(source, /限时活动/);
@@ -140,15 +148,58 @@ test("strategy summary uses cat names and never prints deploy sequence", () => {
     ],
     policy: { deploySequence: ["c1", "c1", "c2"] },
   }, "万圣节之夜・地狱", new Map([
-    ["c1", "狮子王喵"],
-    ["c2", "星空狙击喵"],
+    ["c1", { name: "狮子王喵", tier: "A" }],
+    ["c2", { name: "星空狙击喵", tier: "S" }],
   ]));
-  assert.equal(summary, [
-    "策略名称：daily-heavy",
-    "适用关卡：万圣节之夜・地狱",
-    "策略队伍：狮子王喵 Lv.12；星空狙击喵 Lv.7",
-  ].join("\n"));
-  assert.doesNotMatch(summary, /c1|c2|出战顺序/);
+  assert.deepEqual(summary, {
+    name: "daily-heavy",
+    stage: "万圣节之夜・地狱",
+    team: [
+      { name: "狮子王喵", level: 12, tier: "A" },
+      { name: "星空狙击喵", level: 7, tier: "S" },
+    ],
+  });
+  assert.doesNotMatch(JSON.stringify(summary), /c1|c2|出战顺序/);
+});
+
+test("validation separates JSON success from an unavailable preparation screen", () => {
+  const buildUiValidationResults = markedFunction("buildUiValidationResults");
+  const results = buildUiValidationResults({
+    name: "daily-heavy",
+    stageId: 20,
+    team: [{ id: "c7", level: 48 }],
+    items: [],
+  }, null, null, new Map([["c7", { name: "虎斑", tier: "C" }]]));
+  assert.deepEqual(results, [
+    { type: "success", text: "JSON 解析成功。" },
+    { type: "warning", text: "当前未处于战斗准备界面。" },
+  ]);
+});
+
+test("validation reports stage, team and item errors separately", () => {
+  const buildUiValidationResults = markedFunction("buildUiValidationResults");
+  const results = buildUiValidationResults({
+    name: "broken",
+    stageId: 20,
+    team: [
+      { id: "c7", level: 48 },
+      { id: "c1", level: 12 },
+    ],
+    items: ["rally"],
+  }, null, {
+    title: "第 99 关",
+    stageMatch: false,
+    stage: { id: 99, name: "第 99 关" },
+    team: [{ id: "c7", name: "虎斑", tier: "C", level: 48 }],
+    items: [{ id: "rally", name: "全軍振奮", count: 0, selected: false }],
+  }, new Map([
+    ["c7", { name: "虎斑", tier: "C" }],
+    ["c1", { name: "白糰子", tier: "C" }],
+  ]));
+  assert.deepEqual(results.map((result) => result.type), ["success", "error", "error", "error"]);
+  assert.match(results[1].text, /^关卡不符：/);
+  assert.match(results[2].text, /^配队不符：.*白糰子\(12\)/);
+  assert.match(results[3].text, /^道具不足：/);
 });
 
 test("the export scope lists campaign, endless, daily and active raid stages", () => {
