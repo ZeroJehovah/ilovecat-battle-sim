@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         喵喵的逆袭 · 数据导出与策略执行
 // @namespace    https://github.com/ZeroJehovah/ilovecat-battle-sim
-// @version      0.5.1
+// @version      0.5.2
 // @description  按范围只读导出战斗数据与 JS，并从在线索引或本地文件选择策略操作战斗页面
 // @match        https://api.ilovecat520.me/*
 // @updateURL    https://raw.githubusercontent.com/ZeroJehovah/ilovecat-battle-sim/main/tools/ilovecat-workbench.user.js
@@ -18,7 +18,7 @@
 
   const STRATEGY_FORMAT = "ilovecat-battle-strategy";
   const EXPORT_FORMAT = "ilovecat-game-export";
-  const USERSCRIPT_VERSION = "0.5.1";
+  const USERSCRIPT_VERSION = "0.5.2";
   const STRATEGY_INDEX_URL = "https://github.com/ZeroJehovah/ilovecat-battle-sim-docs/raw/main/strategies/index.json";
   const STRATEGY_INDEX_TTL_MS = 5 * 60 * 1000;
   const ACTION_GAP_MS = 250;
@@ -147,6 +147,10 @@
         }
         .strategy-source-title { color: #f0b95c; font-size: 13px; font-weight: 700; }
         .online-stage-filters { display: flex; flex-wrap: wrap; gap: 6px; }
+        .online-stage-filters.loading {
+          min-height: 28px; justify-content: center; align-items: center;
+        }
+        .online-stage-filters.loading .online-stage-empty { text-align: center; }
         .online-stage-filter, .refresh-strategies {
           border: 1px solid #4d5868; border-radius: 999px; background: #171e27;
           color: #d8cdb9; padding: 3px 9px; cursor: pointer; font-size: 11px;
@@ -202,8 +206,6 @@
           min-width: 0; color: #e7c98f; font-size: 11px; line-height: 1.4;
           overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
         }
-        .online-index-status { min-height: 18px; }
-        .online-index-status.error { color: #ffaaa4; }
         .local-file-status.error { color: #ffaaa4; }
         .execution-panel {
           margin-top: 10px; padding: 10px; border: 1px solid #3e4857;
@@ -341,14 +343,12 @@
         </div>
         <div class="view" data-view="online" hidden>
           <div class="strategy-source">
-            <div class="online-stage-filters" role="group" aria-label="在线策略关卡筛选">
-              <button class="refresh-strategies" type="button" title="刷新策略" aria-label="刷新策略">${REFRESH_ICON_SVG}</button>
+            <div class="online-stage-filters loading" role="group" aria-label="在线策略关卡筛选">
               <span class="online-stage-empty">加载后显示支持的关卡</span>
             </div>
             <div class="online-strategies" role="listbox" aria-label="在线策略列表">
               <div class="online-strategy-empty">打开此页后自动加载，请稍候。</div>
             </div>
-            <div class="online-index-status muted" aria-live="polite">尚未加载在线策略。</div>
           </div>
         </div>
         <div class="view" data-view="local" hidden>
@@ -404,8 +404,6 @@
       strategyFile: root.querySelector(".strategy-file"),
       onlineStageFilters: root.querySelector(".online-stage-filters"),
       onlineStrategies: root.querySelector(".online-strategies"),
-      onlineIndexStatus: root.querySelector(".online-index-status"),
-      refreshStrategies: root.querySelector(".refresh-strategies"),
       localFileStatus: root.querySelector(".local-file-status"),
       executionPanel: root.querySelector(".execution-panel"),
       autoStart: root.querySelector(".auto-start"),
@@ -520,15 +518,16 @@
         throw error;
       }
     }));
-    ui.refreshStrategies.addEventListener("click", () => runBusy(async () => {
-      await ensureOnlineStrategies(true);
-    }));
     ui.onlineStrategies.addEventListener("click", (event) => {
       const button = event.target.closest(".online-strategy");
       if (!button || !button.dataset.strategyId || busy || executor) return;
       runBusy(() => selectOnlineStrategy(button.dataset.strategyId));
     });
     ui.onlineStageFilters.addEventListener("click", (event) => {
+      if (event.target.closest(".refresh-strategies")) {
+        if (!busy && !executor) runBusy(() => ensureOnlineStrategies(true));
+        return;
+      }
       const button = event.target.closest(".online-stage-filter");
       if (!button || !button.dataset.stageId || busy || executor) return;
       selectOnlineStage(button.dataset.stageId);
@@ -580,7 +579,6 @@
     const locked = busy || Boolean(executor);
     ui.loadStrategy.disabled = locked;
     ui.strategyFile.disabled = locked;
-    ui.refreshStrategies.disabled = locked;
     for (const button of ui.onlineStageFilters.querySelectorAll("button")) button.disabled = locked;
     for (const button of ui.onlineStrategies.querySelectorAll("button")) button.disabled = locked;
     ui.run.disabled = locked || !activeStrategyText;
@@ -622,11 +620,6 @@
     syncStrategyControls();
   }
 
-  function setOnlineStatus(message, error = false) {
-    ui.onlineIndexStatus.textContent = message;
-    ui.onlineIndexStatus.classList.toggle("error", error);
-  }
-
   function onlineEmpty(message) {
     const empty = document.createElement("div");
     empty.className = "online-strategy-empty";
@@ -634,13 +627,18 @@
     return empty;
   }
 
-  function renderOnlineStageFilters(stages) {
+  function renderOnlineStageFilters(stages, emptyMessage = "没有可用关卡") {
     const fragment = document.createDocumentFragment();
-    const refresh = ui.onlineStageFilters.querySelector(".refresh-strategies");
+    const refresh = document.createElement("button");
+    refresh.type = "button";
+    refresh.className = "refresh-strategies";
+    refresh.title = "刷新策略";
+    refresh.setAttribute("aria-label", "刷新策略");
+    refresh.innerHTML = REFRESH_ICON_SVG;
     if (!stages.length) {
       const empty = document.createElement("span");
       empty.className = "online-stage-empty";
-      empty.textContent = "没有可用关卡";
+      empty.textContent = emptyMessage;
       fragment.append(empty);
     }
     for (const stage of stages) {
@@ -654,6 +652,7 @@
       button.textContent = `${stage.name} · ${stage.id} (${stage.count})`;
       fragment.append(button);
     }
+    ui.onlineStageFilters.classList.remove("loading");
     ui.onlineStageFilters.replaceChildren(refresh, fragment);
   }
 
@@ -714,8 +713,6 @@
         : "索引中没有符合当前阵容等级的策略。"));
     }
     ui.onlineStrategies.replaceChildren(fragment);
-    const capturedAt = onlineStrategyIndex.roster.capturedAt.replace("T", " ").slice(0, 16);
-    setOnlineStatus(`${stages.length} 个关卡 · 当前显示 ${visible.length}/${onlineStrategyIndex.strategies.length} 个有效策略 · 等级基准 ${capturedAt}`);
     syncStrategyControls();
   }
 
@@ -743,7 +740,6 @@
     if (!onlineStrategyIndex) {
       ui.onlineStrategies.replaceChildren(onlineEmpty("正在读取在线策略索引…"));
     }
-    setOnlineStatus(force ? "正在刷新在线策略索引…" : "正在读取在线策略索引…");
     onlineStrategyIndexPromise = (async () => {
       const text = await requestRemoteText(STRATEGY_INDEX_URL);
       const index = parseStrategyIndex(text);
@@ -760,9 +756,8 @@
     } catch (error) {
       if (!onlineStrategyIndex) {
         ui.onlineStrategies.replaceChildren(onlineEmpty("在线索引读取失败。可检查 GitHub 登录态后刷新，或使用本地 JSON。"));
+        renderOnlineStageFilters([], "读取失败，点击刷新重试");
       }
-      const message = error instanceof Error ? error.message : String(error);
-      setOnlineStatus(`在线策略加载失败：${message}`, true);
       throw error;
     } finally {
       onlineStrategyIndexPromise = null;
@@ -774,7 +769,7 @@
     const index = onlineStrategyIndex ?? await ensureOnlineStrategies();
     const entry = index.strategies.find((strategy) => strategy.id === id);
     if (!entry) throw new Error("选中的在线策略已不在最新索引中，请刷新后重试。");
-    setOnlineStatus(`正在载入「${entry.title}」…`);
+    setRunStatus("正在载入策略并自动校验…");
     try {
       const text = await requestRemoteText(entry.rawUrl);
       const strategy = parseStrategy(text);
@@ -783,10 +778,7 @@
       renderOnlineStrategies();
       await validateFromUi();
       renderOnlineStrategies();
-      setOnlineStatus("策略已自动校验。");
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      setOnlineStatus(`策略载入失败：${message}`, true);
       throw error;
     }
   }

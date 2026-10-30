@@ -26,7 +26,7 @@ test("the userscript is syntactically valid and exposes both workflows", () => {
   assert.match(source, /@grant\s+GM_xmlhttpRequest/);
   assert.match(source, /@connect\s+github\.com/);
   assert.match(source, /@connect\s+raw\.githubusercontent\.com/);
-  assert.match(source, /USERSCRIPT_VERSION = "0\.5\.1"/);
+  assert.match(source, /USERSCRIPT_VERSION = "0\.5\.2"/);
   assert.match(source, /<div class="title">喵喵的逆袭工具 <span class="version">v\$\{USERSCRIPT_VERSION\}<\/span><\/div>/);
   assert.match(source, /ilovecat-game-export/);
   assert.match(source, /ilovecat-battle-strategy/);
