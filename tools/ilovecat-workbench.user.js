@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         喵喵的逆袭 · 数据导出与策略执行
 // @namespace    https://github.com/ZeroJehovah/ilovecat-battle-sim
-// @version      0.5.2
+// @version      0.5.3
 // @description  按范围只读导出战斗数据与 JS，并从在线索引或本地文件选择策略操作战斗页面
 // @match        https://api.ilovecat520.me/*
 // @updateURL    https://raw.githubusercontent.com/ZeroJehovah/ilovecat-battle-sim/main/tools/ilovecat-workbench.user.js
@@ -18,7 +18,7 @@
 
   const STRATEGY_FORMAT = "ilovecat-battle-strategy";
   const EXPORT_FORMAT = "ilovecat-game-export";
-  const USERSCRIPT_VERSION = "0.5.2";
+  const USERSCRIPT_VERSION = "0.5.3";
   const STRATEGY_INDEX_URL = "https://github.com/ZeroJehovah/ilovecat-battle-sim-docs/raw/main/strategies/index.json";
   const STRATEGY_INDEX_TTL_MS = 5 * 60 * 1000;
   const ACTION_GAP_MS = 250;
@@ -38,7 +38,7 @@
     rally: "全軍振奮",
   };
   /*
-   * Lucide "refresh-cw" icon: https://lucide.dev/icons/refresh-cw
+   * Lucide "refresh-cw" icon (filter refresh and validation retry): https://lucide.dev/icons/refresh-cw
    * Copyright (c) 2026 Lucide Icons and Contributors
    * ISC License
    * Permission to use, copy, modify, and/or distribute this software for any
@@ -288,6 +288,13 @@
         .validation-line.success { color: #b8e7c0; }
         .validation-line.warning { color: #f4ca7c; }
         .validation-line.error { color: #ffaaa4; }
+        .validation-retry-row { display: flex; justify-content: flex-end; margin-top: 6px; }
+        .retry-validation {
+          display: grid; place-items: center; width: 29px; height: 27px; padding: 3px;
+          border: 1px solid #5e513d; border-radius: 8px; background: #282f3a;
+          color: #f7ead0; cursor: pointer;
+        }
+        .retry-validation svg { display: block; width: 17px; height: 17px; }
         .copy-fallback[hidden] { display: none !important; }
         .copy-fallback { margin-top: 10px; }
         .copy-fallback textarea { min-height: 150px; }
@@ -507,11 +514,11 @@
       try {
         if (file.size > 2 * 1024 * 1024) throw new Error("策略文件超过 2 MiB，已拒绝读取。");
         const text = await file.text();
-        parseStrategy(text);
         setActiveStrategy(text);
-        ui.localFileStatus.textContent = file.name;
         setRunStatus("本地策略已载入，正在自动校验。");
-        await validateFromUi();
+        const validation = await validateFromUi();
+        ui.localFileStatus.textContent = validation.valid ? file.name : `${file.name}（校验失败）`;
+        ui.localFileStatus.classList.toggle("error", !validation.valid);
       } catch (error) {
         ui.localFileStatus.textContent = "本地文件读取或校验失败";
         ui.localFileStatus.classList.add("error");
@@ -531,6 +538,14 @@
       const button = event.target.closest(".online-stage-filter");
       if (!button || !button.dataset.stageId || busy || executor) return;
       selectOnlineStage(button.dataset.stageId);
+    });
+    ui.runStatus.addEventListener("click", (event) => {
+      if (!event.target.closest(".retry-validation") || busy || executor) return;
+      runBusy(async () => {
+        const validation = await validateFromUi();
+        updateLocalFileValidationStatus(validation);
+        if (selectedOnlineStrategyId) renderOnlineStrategies();
+      });
     });
     ui.run.addEventListener("click", () => runBusy(() => startFromUi()));
     ui.stop.addEventListener("click", () => stopExecutor("用户停止。"));
@@ -581,6 +596,7 @@
     ui.strategyFile.disabled = locked;
     for (const button of ui.onlineStageFilters.querySelectorAll("button")) button.disabled = locked;
     for (const button of ui.onlineStrategies.querySelectorAll("button")) button.disabled = locked;
+    for (const button of ui.runStatus.querySelectorAll(".retry-validation")) button.disabled = locked;
     ui.run.disabled = locked || !activeStrategyText;
     ui.stop.disabled = !executor;
   }
@@ -602,6 +618,15 @@
     }
     clearStrategySummary();
     syncStrategyControls();
+  }
+
+  function updateLocalFileValidationStatus(validation) {
+    if (selectedOnlineStrategyId) return;
+    const status = ui.localFileStatus.textContent;
+    if (!status || status === "未选择文件" || status === "本地文件读取或校验失败" || status.startsWith("正在读取 ")) return;
+    const fileName = status.replace(/（校验失败）$/, "");
+    ui.localFileStatus.textContent = validation.valid ? fileName : `${fileName}（校验失败）`;
+    ui.localFileStatus.classList.toggle("error", !validation.valid);
   }
 
   function clearActiveStrategy(message = "", error = false) {
@@ -772,8 +797,6 @@
     setRunStatus("正在载入策略并自动校验…");
     try {
       const text = await requestRemoteText(entry.rawUrl);
-      const strategy = parseStrategy(text);
-      validateIndexedStrategy(index, entry, strategy);
       setActiveStrategy(text, entry.id);
       renderOnlineStrategies();
       await validateFromUi();
@@ -803,6 +826,19 @@
       line.className = `validation-line ${result.type}`;
       line.textContent = result.text;
       fragment.append(line);
+    }
+    if (activeStrategyText && results.some((result) => result.type === "error")) {
+      const row = document.createElement("div");
+      row.className = "validation-retry-row";
+      const retry = document.createElement("button");
+      retry.type = "button";
+      retry.className = "retry-validation";
+      retry.title = "重新校验策略";
+      retry.setAttribute("aria-label", "重新校验策略");
+      retry.disabled = busy || Boolean(executor);
+      retry.innerHTML = REFRESH_ICON_SVG;
+      row.append(retry);
+      fragment.append(row);
     }
     ui.runStatus.replaceChildren(fragment);
   }
@@ -1635,19 +1671,22 @@
 
   async function validateFromUi() {
     clearStrategySummary();
+    ui.itemWarning.hidden = true;
+    ui.itemWarning.textContent = "";
     if (!activeStrategyText) {
-      setValidationResults([{ type: "error", text: "请先选择在线策略或本地 JSON 文件。" }]);
-      return null;
+      const results = [{ type: "error", text: "请先选择在线策略或本地 JSON 文件。" }];
+      setValidationResults(results);
+      return { strategy: null, active: null, prep: null, results, valid: false };
     }
     let strategy;
     try {
       strategy = parseStrategy(activeStrategyText);
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error);
-      setValidationResults([{ type: "error", text: `JSON 解析失败：${detail}` }]);
-      return null;
+      const results = [{ type: "error", text: `JSON 解析失败：${detail}` }];
+      setValidationResults(results);
+      return { strategy: null, active: null, prep: null, results, valid: false };
     }
-    setValidationResults([{ type: "success", text: "JSON 解析成功。" }]);
     const runtime = findBattleRuntime();
     const active = isActiveRuntime(runtime) ? runtime : { context: null, snapshot: null };
     const prep = active.context ? null : findPreparationRuntime(strategy);
@@ -1655,9 +1694,35 @@
     activeStrategyCats = display.cats;
     renderStrategySummary(buildStrategySummary(strategy, display.stageName, display.cats));
     const results = buildUiValidationResults(strategy, active, prep, display.cats, ITEM_NAMES);
+    if (selectedOnlineStrategyId) {
+      const entry = onlineStrategyIndex?.strategies.find((item) => item.id === selectedOnlineStrategyId);
+      if (!entry) {
+        results.splice(1, 0, { type: "error", text: "在线策略已从有效索引移除，请刷新策略列表后重新选择。" });
+      } else {
+        try {
+          validateIndexedStrategy(onlineStrategyIndex, entry, strategy);
+        } catch (error) {
+          const detail = error instanceof Error ? error.message : String(error);
+          results.splice(1, 0, { type: "error", text: `在线策略与索引校验失败：${detail}` });
+        }
+      }
+    }
+    const actionGap = Number(strategy.policy?.actionGap ?? ACTION_GAP_MS / 1000);
+    if (Math.abs(actionGap - ACTION_GAP_MS / 1000) > 1e-9) {
+      results.splice(1, 0, {
+        type: "warning",
+        text: `策略 actionGap=${actionGap}s，执行器固定 ${ACTION_GAP_MS}ms，节奏会不一致。`,
+      });
+    }
     setValidationResults(results);
     updateItemWarning(strategy, prep, Boolean(active.context));
-    return strategy;
+    return {
+      strategy,
+      active,
+      prep,
+      results,
+      valid: !results.some((result) => result.type === "error"),
+    };
   }
 
   function isActiveRuntime(runtime) {
@@ -1762,9 +1827,8 @@
         return [{ type: "success", text: "关卡匹配。" }];
       }
       if (prep?.stageMatch === false) {
-        const expected = strategy.stage?.name || "id " + strategy.stageId;
-        const actual = prep.stage?.name || prep.title || "";
-        return [{ type: "error", text: "关卡不符：策略为「" + expected + "」，当前为「" + actual + "」。" }];
+        const stageCheck = validatePreparationStage(strategy, prep);
+        return [{ type: "error", text: stageCheck.messages[0] }];
       }
       return [{ type: "success", text: "关卡匹配。" }];
     };
@@ -2025,64 +2089,6 @@
     return candidates.find((stage) => matchesStageTitle(title, stage.name) || String(title).includes(stage.name)) || candidates[0];
   }
 
-  function validatePreparation(strategy, prep) {
-    const messages = [`准备界面：${prep.title}`];
-    const stageCheck = validatePreparationStage(strategy, prep);
-    messages.push(...stageCheck.messages);
-    let hasError = stageCheck.hasError;
-    const expectedTeam = Array.isArray(strategy.team) ? strategy.team : [];
-    const nameOf = (id) => prep.names?.get(id) || prep.team.find((entry) => entry.id === id)?.name || id;
-
-    if (expectedTeam.length) {
-      const actualIds = prep.team.map((entry) => entry.id);
-      const expectedIds = expectedTeam.map((entry) => entry.id);
-      const missing = expectedIds.filter((id) => !actualIds.includes(id));
-      if (missing.length) {
-        messages.push(`错误：编队缺少策略需要的 ${missing.map((id) => `${id} ${nameOf(id)}`).join("、")}。当前编队：${prep.team.map((entry) => `${entry.id} ${entry.name}`).join(" / ") || "空"}。`);
-        hasError = true;
-      } else {
-        messages.push(`队伍：所需猫咪均在编队中（${expectedIds.map((id) => `${id} ${nameOf(id)}`).join(" / ")}）。顺序不强制。`);
-        const positions = expectedIds.map((id) => actualIds.indexOf(id));
-        const orderPreserved = positions.every((slot, index) => index === 0 || slot > positions[index - 1]);
-        if (!orderPreserved) {
-          messages.push("提示：编队顺序与策略不同；游戏机制不受影响，执行器按猫 id 查找槽位。");
-        }
-        const onSecondPage = expectedIds.filter((id) => actualIds.indexOf(id) >= 5);
-        if (onSecondPage.length) {
-          messages.push(`提示：${onSecondPage.map((id) => `${id} ${nameOf(id)}`).join("、")} 在第 2 页；执行器会直接按 6–0 部署，不切换页面。`);
-        }
-        const extras = actualIds.filter((id) => !expectedIds.includes(id));
-        if (extras.length) {
-          messages.push(`额外槽位：${extras.map((id) => `${id} ${nameOf(id)}`).join("、")}；不会被策略主动部署。`);
-        }
-      }
-      const actualLevels = new Map(prep.team.map((entry) => [entry.id, entry.level]));
-      const levelMismatch = expectedTeam.filter((entry) => actualIds.includes(entry.id) && Number(entry.level) !== actualLevels.get(entry.id));
-      if (levelMismatch.length) {
-        messages.push(`警告：准备等级不一致：${levelMismatch.map((entry) => `${entry.id} ${nameOf(entry.id)} 需要 ${entry.level}，当前 ${actualLevels.get(entry.id)}`).join("；")}。`);
-      }
-    }
-
-    const expectedItems = new Set((Array.isArray(strategy.items) ? strategy.items : []).map(String));
-    const itemName = (id) => prep.items.find((item) => item.id === id)?.name || ITEM_NAMES[id] || id;
-    const selectedItems = prep.items.filter((item) => item.selected);
-    const missing = [...expectedItems].filter((id) => !selectedItems.some((item) => item.id === id));
-    const extra = selectedItems.filter((item) => !expectedItems.has(item.id));
-    const unavailable = [...expectedItems].filter((id) => {
-      const item = prep.items.find((entry) => entry.id === id);
-      return !item || item.count <= 0;
-    });
-    if (missing.length || extra.length || unavailable.length) {
-      messages.push(`错误：准备道具不一致。缺少 ${missing.map(itemName).join("、") || "无"}；多选 ${extra.map((item) => itemName(item.id)).join("、") || "无"}；库存不足 ${unavailable.map(itemName).join("、") || "无"}。`);
-      hasError = true;
-    } else {
-      messages.push(`道具：${selectedItems.length ? selectedItems.map((item) => item.name).join("、") : "未使用"}。`);
-    }
-
-    messages.push(hasError ? "准备校验失败，未点击开始战斗。" : "准备校验通过。");
-    return messages;
-  }
-
   function validatePreparationStage(strategy, prep) {
     if (prep.stageMatch !== false) {
       return {
@@ -2167,18 +2173,10 @@
   }
 
   async function startFromUi() {
-    if (!activeStrategyText) throw new Error("请先选择在线策略或本地 JSON 文件。");
-    const strategy = parseStrategy(activeStrategyText);
-    const runtime = findBattleRuntime();
-    const active = isActiveRuntime(runtime) ? runtime : { context: null, snapshot: null };
-    let prep = active.context ? null : findPreparationRuntime(strategy);
-    const names = namesForStrategy(strategy, active, prep);
-    const validation = validateStrategy(strategy, active, names);
-    setRunStatus(validation.join("\n"), validation.some((line) => line.startsWith("错误")));
-    updateItemWarning(strategy, prep, Boolean(active.context));
-    if (validation.some((line) => line.startsWith("错误"))) {
-      throw new Error(validation.join("\n") || "策略校验失败，未开始执行。");
-    }
+    const validation = await validateFromUi();
+    updateLocalFileValidationStatus(validation);
+    if (!validation.strategy || !validation.valid) return;
+    let { strategy, active, prep, results } = validation;
 
     if (active.context) {
       startExecutor(strategy, active);
@@ -2186,25 +2184,34 @@
     }
 
     if (!ui.autoStart.checked) {
-      throw new Error("当前没有进行中的战斗。勾选“自动开始战斗”，或先手动开始战斗。");
+      appendValidationError(results, "当前没有进行中的战斗。勾选“自动开始战斗”，或先手动开始战斗。");
+      return;
     }
 
-    if (!prep) throw new Error("没有找到可用的“出战”准备界面。请先打开策略对应的关卡准备界面。");
-    const stageCheck = validatePreparationStage(strategy, prep);
-    if (stageCheck.hasError) {
-      const full = [...validation, `准备界面：${prep.title}`, ...stageCheck.messages];
-      setRunStatus(full.join("\n"), true);
-      throw new Error(stageCheck.messages.join("\n"));
+    if (!prep) {
+      appendValidationError(results, "没有找到可用的“出战”准备界面。请先打开策略对应的关卡准备界面。");
+      return;
     }
-    setRunStatus(`${validation.join("\n")}\n\n正在按策略勾选消耗品…`);
-    prep = await selectPreparationItems(strategy, prep);
-    updateItemWarning(strategy, prep);
-    const preparation = validatePreparation(strategy, prep);
-    const combined = [...validation, ...preparation];
-    const hasError = combined.some((line) => line.startsWith("错误"));
-    setRunStatus(combined.join("\n"), hasError);
-    if (hasError) {
-      throw new Error(combined.join("\n") || "准备校验失败，未点击开始战斗。");
+
+    try {
+      await selectPreparationItems(strategy, prep);
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      appendValidationError(results, detail);
+      return;
+    }
+
+    const preparedValidation = await validateFromUi();
+    updateLocalFileValidationStatus(preparedValidation);
+    if (!preparedValidation.strategy || !preparedValidation.valid) return;
+    ({ strategy, active, prep, results } = preparedValidation);
+    if (active.context) {
+      startExecutor(strategy, active);
+      return;
+    }
+    if (!prep) {
+      appendValidationError(results, "战斗准备界面在校验期间已关闭，请重新打开后重试。");
+      return;
     }
 
     stopExecutor("", false);
@@ -2234,10 +2241,16 @@
     };
     ui.run.disabled = true;
     executor.timer = setTimeout(executeTick, 0);
-    const speedNote = ui.autoSpeed.checked ? "\n自动倍速：已把战斗保存倍速设为 1×。" : "";
-    setRunStatus(`${combined.join("\n")}${speedNote}\n\n正在点击“开始战斗”…`);
+    setRunStatus("校验通过，正在点击“开始战斗”…");
     if (ui.autoSpeed.checked) setStoredBattleSpeed(1);
     prep.startButton.click();
+  }
+
+  function appendValidationError(results, message) {
+    setValidationResults([
+      ...results.filter((result) => result.text !== "校验通过。"),
+      { type: "error", text: message },
+    ]);
   }
 
   function startExecutor(strategy, runtime) {
