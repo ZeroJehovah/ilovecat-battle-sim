@@ -34,10 +34,10 @@ test("snapshot contains the current catalog and endless wave data", () => {
 
   const shadowWave = snapshot.stage.waves.find((wave) => wave.at === 745);
   assert.deepEqual(shadowWave.traits, ["rage"]);
-  assert.equal(shadowWave.mouse, "m18");
+  assert.equal(shadowWave.mouse, "m17");
   assert.equal(shadowWave.scale, 40.35);
-  assert.equal(Math.round(mouse("m18").hp * shadowWave.scale), 80700);
-  assert.equal(Math.round(mouse("m18").atk * shadowWave.scale), 6053);
+  assert.equal(Math.round(mouse("m17").hp * shadowWave.scale), 242100);
+  assert.equal(Math.round(mouse("m17").atk * shadowWave.scale), 2825);
 });
 
 test("level growth and Tian lightning use full primary and 50% secondary damage", () => {

@@ -1,5 +1,5 @@
 {
-  "capturedAt": "2026-10-28T08:57:42.438566+00:00",
+  "capturedAt": "2026-11-02T01:07:56.614Z",
   "catalog": {
     "cats": [
       {
@@ -3478,240 +3478,236 @@
     ]
   },
   "endlessMeta": {
-    "ends": "2026-11-01",
-    "season": "2026-10-26"
+    "season": "2026-11-02",
+    "ends": "2026-11-08"
   },
   "schemaVersion": 1,
   "source": "https://api.ilovecat520.me/playground/battle",
   "stage": {
-    "base_hp": 99999999,
-    "description": "老鼠一輪比一輪強，要塞打不倒。撐越久分數越高，每週一重新排名，每週的戰場效果都不一樣。",
     "id": 9101,
-    "look": 10,
-    "min_seconds": 0,
-    "modifier": "gravity",
     "name": "無盡模式",
-    "reward": 0,
+    "description": "老鼠一輪比一輪強，要塞打不倒。撐越久分數越高，每週一重新排名，每週的戰場效果都不一樣。",
+    "base_hp": 99999999,
     "scale": 1,
+    "reward": 0,
+    "min_seconds": 0,
     "shield_seconds": 0,
-    "time_limit": 900,
-    "tip": "精英和頭目有怒氣條：一直被冰凍、推擠會暴怒，暫時不怕控場還會震暈旁邊的貓。帶火焰標記的老鼠不怕冰。",
     "waves": [
       {
         "at": 5,
+        "mouse": "m1",
         "count": 3,
         "gap": 0.7,
-        "mouse": "m1",
         "scale": 1
       },
       {
         "at": 11,
+        "mouse": "m9",
         "count": 1,
         "gap": 1.2,
-        "mouse": "m5",
         "scale": 1
       },
       {
         "at": 20,
+        "mouse": "m1",
         "count": 3,
         "gap": 0.7,
-        "mouse": "m1",
         "scale": 1.08
       },
       {
         "at": 26,
+        "mouse": "m10",
         "count": 1,
         "gap": 1.2,
-        "mouse": "m6",
         "scale": 1.08
       },
       {
         "at": 35,
+        "mouse": "m1",
         "count": 3,
         "gap": 0.7,
-        "mouse": "m1",
         "scale": 1.16
       },
       {
         "at": 41,
+        "mouse": "m11",
         "count": 1,
         "gap": 1.2,
-        "mouse": "m8",
         "scale": 1.16
       },
       {
         "at": 50,
+        "mouse": "m1",
         "count": 3,
         "gap": 0.7,
-        "mouse": "m1",
         "scale": 1.25
       },
       {
         "at": 56,
+        "mouse": "m12",
         "count": 1,
         "gap": 1.2,
-        "mouse": "m9",
         "scale": 1.25
       },
       {
         "at": 65,
+        "mouse": "m1",
         "count": 3,
         "gap": 0.7,
-        "mouse": "m1",
         "scale": 1.35
       },
       {
         "at": 71,
+        "mouse": "m13",
         "count": 1,
         "gap": 1.2,
-        "mouse": "m10",
         "scale": 1.35
       },
       {
         "at": 80,
+        "mouse": "m1",
         "count": 3,
         "gap": 0.7,
-        "mouse": "m1",
         "scale": 1.45
       },
       {
         "at": 86,
+        "mouse": "m14",
         "count": 1,
         "gap": 1.2,
-        "mouse": "m11",
         "scale": 1.45
       },
       {
         "at": 94,
+        "mouse": "m13",
         "count": 1,
         "gap": 1.5,
-        "mouse": "m10",
         "scale": 1.45
       },
       {
         "at": 95,
+        "mouse": "m1",
         "count": 4,
         "gap": 0.7,
-        "mouse": "m1",
         "scale": 1.56
       },
       {
         "at": 101,
+        "mouse": "m2",
         "count": 1,
         "gap": 1.2,
-        "mouse": "m12",
         "scale": 1.56
       },
       {
         "at": 125,
+        "mouse": "m1",
         "count": 4,
         "gap": 0.7,
-        "mouse": "m1",
         "scale": 1.81
       },
       {
         "at": 131,
+        "mouse": "m3",
         "count": 1,
         "gap": 1.2,
-        "mouse": "m13",
         "scale": 1.81
       },
       {
         "at": 145,
+        "mouse": "m17",
         "count": 1,
         "gap": 3,
-        "mouse": "m18",
         "scale": 1.81
       },
       {
         "at": 155,
+        "mouse": "m1",
         "count": 4,
         "gap": 0.7,
-        "mouse": "m1",
         "scale": 2.1
       },
       {
         "at": 161,
+        "mouse": "m4",
         "count": 1,
         "gap": 1.2,
-        "mouse": "m14",
         "scale": 2.1
       },
       {
         "at": 169,
+        "mouse": "m3",
         "count": 1,
         "gap": 1.5,
-        "mouse": "m13",
         "scale": 2.1
       },
       {
         "at": 185,
+        "mouse": "m1",
         "count": 5,
         "gap": 0.7,
-        "mouse": "m1",
         "scale": 2.44
       },
       {
         "at": 191,
+        "mouse": "m5",
         "count": 2,
         "gap": 1.2,
-        "mouse": "m2",
         "scale": 2.44
       },
       {
         "at": 215,
+        "mouse": "m1",
         "count": 5,
         "gap": 0.7,
-        "mouse": "m1",
         "scale": 2.83
       },
       {
         "at": 221,
+        "mouse": "m6",
         "count": 2,
         "gap": 1.2,
-        "mouse": "m3",
         "scale": 2.83
       },
       {
         "at": 245,
+        "mouse": "m1",
         "count": 5,
         "gap": 0.7,
-        "mouse": "m1",
         "scale": 3.28
       },
       {
         "at": 251,
+        "mouse": "m8",
         "count": 2,
         "gap": 1.2,
-        "mouse": "m4",
         "scale": 3.28
       },
       {
         "at": 259,
+        "mouse": "m6",
         "count": 2,
         "gap": 1.5,
-        "mouse": "m3",
         "scale": 3.28
       },
       {
         "at": 275,
+        "mouse": "m1",
         "count": 6,
         "gap": 0.7,
-        "mouse": "m1",
         "scale": 3.8
       },
       {
         "at": 281,
+        "mouse": "m9",
         "count": 2,
         "gap": 1.2,
-        "mouse": "m5",
         "scale": 3.8
       },
       {
         "at": 295,
+        "mouse": "m18",
         "count": 1,
         "gap": 3,
-        "mouse": "m15",
         "scale": 3.8,
         "traits": [
           "rage"
@@ -3719,65 +3715,65 @@
       },
       {
         "at": 305,
+        "mouse": "m1",
         "count": 6,
         "gap": 0.7,
-        "mouse": "m1",
         "scale": 4.41
       },
       {
         "at": 311,
+        "mouse": "m10",
         "count": 2,
         "gap": 1.2,
-        "mouse": "m6",
         "scale": 4.41
       },
       {
         "at": 335,
+        "mouse": "m1",
         "count": 6,
         "gap": 0.7,
-        "mouse": "m1",
         "scale": 5.12
       },
       {
         "at": 341,
+        "mouse": "m11",
         "count": 2,
         "gap": 1.2,
-        "mouse": "m8",
         "scale": 5.12
       },
       {
         "at": 349,
+        "mouse": "m10",
         "count": 2,
         "gap": 1.5,
-        "mouse": "m6",
         "scale": 5.12
       },
       {
         "at": 365,
+        "mouse": "m1",
         "count": 7,
         "gap": 0.7,
-        "mouse": "m1",
         "scale": 5.94
       },
       {
         "at": 371,
+        "mouse": "m12",
         "count": 3,
         "gap": 1.2,
-        "mouse": "m9",
         "scale": 5.94
       },
       {
         "at": 395,
+        "mouse": "m1",
         "count": 7,
         "gap": 0.7,
-        "mouse": "m1",
         "scale": 6.89
       },
       {
         "at": 401,
+        "mouse": "m13",
         "count": 3,
         "gap": 1.2,
-        "mouse": "m10",
         "scale": 6.89,
         "traits": [
           "frostproof"
@@ -3785,30 +3781,30 @@
       },
       {
         "at": 425,
+        "mouse": "m1",
         "count": 7,
         "gap": 0.7,
-        "mouse": "m1",
         "scale": 7.99
       },
       {
         "at": 431,
+        "mouse": "m14",
         "count": 3,
         "gap": 1.2,
-        "mouse": "m11",
         "scale": 7.99
       },
       {
         "at": 439,
+        "mouse": "m13",
         "count": 2,
         "gap": 1.5,
-        "mouse": "m10",
         "scale": 7.99
       },
       {
         "at": 445,
+        "mouse": "m15",
         "count": 1,
         "gap": 3,
-        "mouse": "m16",
         "scale": 7.99,
         "traits": [
           "rage"
@@ -3816,16 +3812,16 @@
       },
       {
         "at": 455,
+        "mouse": "m1",
         "count": 8,
         "gap": 0.7,
-        "mouse": "m1",
         "scale": 9.27
       },
       {
         "at": 461,
+        "mouse": "m2",
         "count": 3,
         "gap": 1.2,
-        "mouse": "m12",
         "scale": 9.27,
         "traits": [
           "frostproof"
@@ -3833,30 +3829,30 @@
       },
       {
         "at": 485,
+        "mouse": "m1",
         "count": 8,
         "gap": 0.7,
-        "mouse": "m1",
         "scale": 10.75
       },
       {
         "at": 491,
+        "mouse": "m3",
         "count": 3,
         "gap": 1.2,
-        "mouse": "m13",
         "scale": 10.75
       },
       {
         "at": 515,
+        "mouse": "m1",
         "count": 8,
         "gap": 0.7,
-        "mouse": "m1",
         "scale": 12.47
       },
       {
         "at": 521,
+        "mouse": "m4",
         "count": 3,
         "gap": 1.2,
-        "mouse": "m14",
         "scale": 12.47,
         "traits": [
           "frostproof"
@@ -3864,9 +3860,9 @@
       },
       {
         "at": 529,
+        "mouse": "m3",
         "count": 3,
         "gap": 1.5,
-        "mouse": "m13",
         "scale": 12.47,
         "traits": [
           "frostproof"
@@ -3874,30 +3870,30 @@
       },
       {
         "at": 545,
+        "mouse": "m1",
         "count": 9,
         "gap": 0.7,
-        "mouse": "m1",
         "scale": 14.46
       },
       {
         "at": 551,
+        "mouse": "m5",
         "count": 4,
         "gap": 1.2,
-        "mouse": "m2",
         "scale": 14.46
       },
       {
         "at": 575,
+        "mouse": "m1",
         "count": 9,
         "gap": 0.7,
-        "mouse": "m1",
         "scale": 16.78
       },
       {
         "at": 581,
+        "mouse": "m6",
         "count": 4,
         "gap": 1.2,
-        "mouse": "m3",
         "scale": 16.78,
         "traits": [
           "frostproof"
@@ -3905,9 +3901,9 @@
       },
       {
         "at": 595,
+        "mouse": "m16",
         "count": 2,
         "gap": 3,
-        "mouse": "m17",
         "scale": 16.78,
         "traits": [
           "rage"
@@ -3915,37 +3911,37 @@
       },
       {
         "at": 605,
+        "mouse": "m1",
         "count": 9,
         "gap": 0.7,
-        "mouse": "m1",
         "scale": 19.46
       },
       {
         "at": 611,
+        "mouse": "m8",
         "count": 4,
         "gap": 1.2,
-        "mouse": "m4",
         "scale": 19.46
       },
       {
         "at": 619,
+        "mouse": "m6",
         "count": 3,
         "gap": 1.5,
-        "mouse": "m3",
         "scale": 19.46
       },
       {
         "at": 635,
+        "mouse": "m1",
         "count": 10,
         "gap": 0.7,
-        "mouse": "m1",
         "scale": 23.35
       },
       {
         "at": 641,
+        "mouse": "m9",
         "count": 4,
         "gap": 1.2,
-        "mouse": "m5",
         "scale": 23.35,
         "traits": [
           "frostproof"
@@ -3953,30 +3949,30 @@
       },
       {
         "at": 665,
+        "mouse": "m1",
         "count": 10,
         "gap": 0.7,
-        "mouse": "m1",
         "scale": 28.02
       },
       {
         "at": 671,
+        "mouse": "m10",
         "count": 4,
         "gap": 1.2,
-        "mouse": "m6",
         "scale": 28.02
       },
       {
         "at": 695,
+        "mouse": "m1",
         "count": 10,
         "gap": 0.7,
-        "mouse": "m1",
         "scale": 33.63
       },
       {
         "at": 701,
+        "mouse": "m11",
         "count": 4,
         "gap": 1.2,
-        "mouse": "m8",
         "scale": 33.63,
         "traits": [
           "frostproof"
@@ -3984,9 +3980,9 @@
       },
       {
         "at": 709,
+        "mouse": "m10",
         "count": 3,
         "gap": 1.5,
-        "mouse": "m6",
         "scale": 33.63,
         "traits": [
           "frostproof"
@@ -3994,23 +3990,23 @@
       },
       {
         "at": 725,
+        "mouse": "m1",
         "count": 11,
         "gap": 0.7,
-        "mouse": "m1",
         "scale": 40.35
       },
       {
         "at": 731,
+        "mouse": "m12",
         "count": 5,
         "gap": 1.2,
-        "mouse": "m9",
         "scale": 40.35
       },
       {
         "at": 745,
+        "mouse": "m17",
         "count": 2,
         "gap": 3,
-        "mouse": "m18",
         "scale": 40.35,
         "traits": [
           "rage"
@@ -4018,16 +4014,16 @@
       },
       {
         "at": 755,
+        "mouse": "m1",
         "count": 11,
         "gap": 0.7,
-        "mouse": "m1",
         "scale": 48.42
       },
       {
         "at": 761,
+        "mouse": "m13",
         "count": 5,
         "gap": 1.2,
-        "mouse": "m10",
         "scale": 48.42,
         "traits": [
           "frostproof"
@@ -4035,37 +4031,37 @@
       },
       {
         "at": 785,
+        "mouse": "m1",
         "count": 11,
         "gap": 0.7,
-        "mouse": "m1",
         "scale": 58.11
       },
       {
         "at": 791,
+        "mouse": "m14",
         "count": 5,
         "gap": 1.2,
-        "mouse": "m11",
         "scale": 58.11
       },
       {
         "at": 799,
+        "mouse": "m13",
         "count": 4,
         "gap": 1.5,
-        "mouse": "m10",
         "scale": 58.11
       },
       {
         "at": 815,
+        "mouse": "m1",
         "count": 12,
         "gap": 0.7,
-        "mouse": "m1",
         "scale": 69.73
       },
       {
         "at": 821,
+        "mouse": "m2",
         "count": 5,
         "gap": 1.2,
-        "mouse": "m12",
         "scale": 69.73,
         "traits": [
           "frostproof"
@@ -4073,30 +4069,30 @@
       },
       {
         "at": 845,
+        "mouse": "m1",
         "count": 12,
         "gap": 0.7,
-        "mouse": "m1",
         "scale": 83.68
       },
       {
         "at": 851,
+        "mouse": "m3",
         "count": 5,
         "gap": 1.2,
-        "mouse": "m13",
         "scale": 83.68
       },
       {
         "at": 875,
+        "mouse": "m1",
         "count": 12,
         "gap": 0.7,
-        "mouse": "m1",
         "scale": 100.41
       },
       {
         "at": 881,
+        "mouse": "m4",
         "count": 5,
         "gap": 1.2,
-        "mouse": "m14",
         "scale": 100.41,
         "traits": [
           "frostproof"
@@ -4104,9 +4100,9 @@
       },
       {
         "at": 889,
+        "mouse": "m3",
         "count": 4,
         "gap": 1.5,
-        "mouse": "m13",
         "scale": 100.41,
         "traits": [
           "frostproof"
@@ -4114,9 +4110,9 @@
       },
       {
         "at": 895,
+        "mouse": "m18",
         "count": 2,
         "gap": 3,
-        "mouse": "m15",
         "scale": 100.41,
         "traits": [
           "rage"
@@ -4124,9 +4120,9 @@
       },
       {
         "at": 447,
+        "mouse": "m19",
         "count": 1,
         "gap": 0,
-        "mouse": "m19",
         "scale": 7.99,
         "traits": [
           "rage"
@@ -4134,14 +4130,18 @@
       },
       {
         "at": 777,
+        "mouse": "m20",
         "count": 1,
         "gap": 0,
-        "mouse": "m20",
         "scale": 48.42,
         "traits": [
           "rage"
         ]
       }
-    ]
+    ],
+    "look": 10,
+    "time_limit": 900,
+    "tip": "精英和頭目有怒氣條：一直被冰凍、推擠會暴怒，暫時不怕控場還會震暈旁邊的貓。帶火焰標記的老鼠不怕冰。",
+    "modifier": "fog"
   }
 }

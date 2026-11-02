@@ -875,6 +875,7 @@
     });
   }
 
+  // testable:sortCatsByTier
   function sortCatsByTier(cats) {
     const tierOrder = ["C", "B", "A", "S"];
     return (Array.isArray(cats) ? cats : [])
@@ -887,6 +888,7 @@
       })
       .map(({ cat }) => cat);
   }
+  // end testable:sortCatsByTier
 
   async function apiGet(name) {
     const uid = localStorage.getItem("uid");
@@ -2089,6 +2091,7 @@
     return candidates.find((stage) => matchesStageTitle(title, stage.name) || String(title).includes(stage.name)) || candidates[0];
   }
 
+  // testable:validatePreparationStage
   function validatePreparationStage(strategy, prep) {
     if (prep.stageMatch !== false) {
       return {
@@ -2107,6 +2110,7 @@
       messages: [`错误：当前准备界面是 ${actual}，与策略关卡 ${expected} 不符。`],
     };
   }
+  // end testable:validatePreparationStage
 
   function updateItemWarning(strategy, prep, inBattle = false) {
     const ids = Array.isArray(strategy.items) ? strategy.items.map(String) : [];

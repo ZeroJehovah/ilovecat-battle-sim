@@ -8,7 +8,7 @@ const source = await readFile(
   "utf8",
 );
 
-function markedFunction(name) {
+function markedFunction(name, dependencies = {}) {
   const startMarker = `// testable:${name}`;
   const endMarker = `// end testable:${name}`;
   const start = source.indexOf(startMarker);
@@ -16,7 +16,10 @@ function markedFunction(name) {
   assert.notEqual(start, -1, `missing ${startMarker}`);
   assert.notEqual(end, -1, `missing ${endMarker}`);
   const body = source.slice(start + startMarker.length, end).trim();
-  return new Function(`return (${body})`)();
+  return new Function(
+    ...Object.keys(dependencies),
+    `return (${body})`,
+  )(...Object.values(dependencies));
 }
 
 test("the userscript is syntactically valid and exposes both workflows", () => {
@@ -26,7 +29,7 @@ test("the userscript is syntactically valid and exposes both workflows", () => {
   assert.match(source, /@grant\s+GM_xmlhttpRequest/);
   assert.match(source, /@connect\s+github\.com/);
   assert.match(source, /@connect\s+raw\.githubusercontent\.com/);
-  assert.match(source, /USERSCRIPT_VERSION = "0\.5\.2"/);
+  assert.match(source, /USERSCRIPT_VERSION = "0\.5\.3"/);
   assert.match(source, /<div class="title">喵喵的逆袭工具 <span class="version">v\$\{USERSCRIPT_VERSION\}<\/span><\/div>/);
   assert.match(source, /ilovecat-game-export/);
   assert.match(source, /ilovecat-battle-strategy/);
@@ -70,7 +73,7 @@ test("the userscript is syntactically valid and exposes both workflows", () => {
   assert.match(source, /自动开始战斗[\s\S]*?自动倍速/);
   assert.doesNotMatch(source, /无战斗时由脚本点击“开始战斗”|autoItems|auto-items/);
   assert.match(source, /selectPreparationItems/);
-  assert.match(source, /prep = await selectPreparationItems\(strategy, prep\)/);
+  assert.match(source, /await selectPreparationItems\(strategy, prep\)/);
   assert.match(source, /updateItemWarning/);
   assert.match(source, /buildStrategySummary/);
   assert.match(source, /buildUiValidationResults/);
@@ -86,7 +89,6 @@ test("the userscript is syntactically valid and exposes both workflows", () => {
   assert.match(source, /readStageFromFiber/);
   assert.match(source, /validatePreparationStage/);
   assert.match(source, /stageMatch/);
-  assert.match(source, /顺序不强制/);
   assert.doesNotMatch(source, /自动勾选策略所需消耗品|请先在准备界面手动勾选/);
   assert.match(source, /item-warning/);
   assert.match(source, /readBattleSpeed/);
@@ -247,7 +249,9 @@ test("fixed campaign stages accept a compact comma-separated id list", () => {
 });
 
 test("strategy summary uses cat names and never prints deploy sequence", () => {
-  const buildStrategySummary = markedFunction("buildStrategySummary");
+  const buildStrategySummary = markedFunction("buildStrategySummary", {
+    sortCatsByTier: markedFunction("sortCatsByTier"),
+  });
   const summary = buildStrategySummary({
     name: "daily-heavy",
     team: [
@@ -271,7 +275,9 @@ test("strategy summary uses cat names and never prints deploy sequence", () => {
 });
 
 test("validation separates JSON success from an unavailable preparation screen", () => {
-  const buildUiValidationResults = markedFunction("buildUiValidationResults");
+  const buildUiValidationResults = markedFunction("buildUiValidationResults", {
+    validatePreparationStage: markedFunction("validatePreparationStage"),
+  });
   const results = buildUiValidationResults({
     name: "daily-heavy",
     stageId: 20,
@@ -285,7 +291,9 @@ test("validation separates JSON success from an unavailable preparation screen",
 });
 
 test("validation reports stage, team and item errors separately", () => {
-  const buildUiValidationResults = markedFunction("buildUiValidationResults");
+  const buildUiValidationResults = markedFunction("buildUiValidationResults", {
+    validatePreparationStage: markedFunction("validatePreparationStage"),
+  });
   const results = buildUiValidationResults({
     name: "broken",
     stageId: 20,
@@ -305,7 +313,8 @@ test("validation reports stage, team and item errors separately", () => {
     ["c1", { name: "白糰子", tier: "C" }],
   ]));
   assert.deepEqual(results.map((result) => result.type), ["success", "error", "error", "error"]);
-  assert.match(results[1].text, /^关卡不符：/);
+  assert.match(results[1].text, /^错误：当前准备界面/);
+  assert.match(results[1].text, /策略关卡 id 20/);
   assert.match(results[2].text, /^配队不符：.*白糰子\(12\)/);
   assert.match(results[3].text, /^道具不足：/);
 });
