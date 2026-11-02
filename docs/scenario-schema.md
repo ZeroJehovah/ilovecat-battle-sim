@@ -27,7 +27,9 @@
     "priority": ["s4", "s1", "c2"],
     "fallbackAfter": 775,
     "fallbackPriority": ["c6", "c2", "c1"],
-    "autoCannon": false,
+    "autoCannon": true,
+    "autoCannonAfter": 600,
+    "autoCannonMinTargets": 1,
     "automatic": true,
     "actionGap": 0.25,
     "observationDelay": 0.1,
@@ -50,17 +52,18 @@
 The action loop runs before each 0.02-second battle step and performs at most one world action per step.
 
 - `actionGap`: minimum simulated seconds between successful world actions (default `0`). Use `0.25` to match the browser executor's 250 ms real-time action throttle. With the 0.02-second step the effective interval becomes the next step at or after the gap (0.26 seconds for `0.25`).
-- `observationDelay`: seconds by which the controller's view of the battle lags the live engine (default `0`). Use `0.1` to model the browser executor's roughly 10 Hz React snapshot: money, wallet level/cost, cannon charge, slot cooldowns, field counts, and result are read from the state captured that long ago. Actions still apply to the live engine. This is an observation limit, not a battle-step limit; the engine itself remains fixed at 0.02 seconds.
+- `observationDelay`: seconds by which the controller's view of the battle lags the live engine (default `0`). Use `0.1` to model the browser executor's roughly 10 Hz React snapshot: money, wallet level/cost, cannon charge, cannon targets, slot cooldowns, field counts, and result are read from the state captured that long ago. Actions still apply to the live engine. This is an observation limit, not a battle-step limit; the engine itself remains fixed at 0.02 seconds.
 - `openers`: cat ids deployed once before the economy phase. Deployment can fail if money or cooldown is insufficient and is retried later.
 - `deploySequence`: optional ordered cat-id list deployed after the wallet target is reached. Repeated ids are allowed. The next entry is strict: if it is unaffordable, cooling down, or unavailable, the policy waits for that exact cat and does not fall through to `priority` or `fallbackPriority` until the sequence is complete.
-- `autoCannon`: with a deploy sequence, a charged cannon may still fire while the policy is waiting for the next fixed unit; the cannon does not spend money or advance the sequence.
+- `autoCannon`: enables automatic cannon decisions. A charged cannon may still fire while the policy is waiting for the next fixed unit; it does not spend money or advance the sequence.
+- `autoCannonAfter`: earliest battle time in seconds for an automatic cannon shot (default `0`). This can keep a cannon charged through low-value early waves and fire it only in the late game.
+- `autoCannonMinTargets`: minimum number of living mice to the right of the cannon line (`x > 455`) before firing (default `0`). The browser executor also accepts `autoCannonFallbackAfter`; if it cannot read live unit positions, it uses that time as a safe late fallback instead of leaving the cannon disabled.
 - `walletTarget`: wallet level from 1 to 8. While below it, the policy first satisfies unfilled openers, then buys the next wallet level when affordable.
 - `economyFirst`: when true, the policy waits for the wallet target before spending on the normal lineup. This does not stop scheduled actions.
 - `targetCounts`: desired number of living copies per cat id. Zero or absent means no permanent target.
 - `priority`: order used to deploy cats that are below their target count. A cat whose slot is on cooldown does not block the next priority.
 - `fallbackAfter`: battle time in seconds after which unused field slots can be filled by replacement units.
 - `fallbackPriority`: order used for replacement units. They are deployed only when no target cat can currently be deployed or when targets are already full.
-- `autoCannon`: fire the paw cannon whenever it is charged.
 - `automatic`: set false to use only `actions`.
 
 ## Scheduled actions

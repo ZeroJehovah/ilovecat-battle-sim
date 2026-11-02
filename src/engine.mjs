@@ -125,6 +125,10 @@ export class BattleEngine {
     return 600 + 400 * (this.walletLevel - 1);
   }
 
+  get cannonTargetCount() {
+    return this.units.filter((unit) => unit.side === "mouse" && !unit.dead && unit.x > 455).length;
+  }
+
   get walletCost() {
     return this.walletLevel >= WALLET_MAX_LEVEL ? 0 : 150 * this.walletLevel;
   }
@@ -646,6 +650,7 @@ export class BattleEngine {
       walletLevel: this.walletLevel,
       walletCost: this.walletCost,
       cannon: Math.min(this.cannonCharge / 30, 1),
+      cannonTargets: this.cannonTargetCount,
       catBaseHp: Math.max(0, round(this.catBaseHp)),
       catBaseMax: this.catBaseMax,
       mouseBaseHp: Math.max(0, round(this.mouseBaseHp)),

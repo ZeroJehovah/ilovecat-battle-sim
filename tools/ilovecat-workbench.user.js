@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         喵喵的逆袭 · 数据导出与策略执行
 // @namespace    https://github.com/ZeroJehovah/ilovecat-battle-sim
-// @version      0.5.3
+// @version      0.5.4
 // @description  按范围只读导出战斗数据与 JS，并从在线索引或本地文件选择策略操作战斗页面
 // @match        https://api.ilovecat520.me/*
 // @updateURL    https://raw.githubusercontent.com/ZeroJehovah/ilovecat-battle-sim/main/tools/ilovecat-workbench.user.js
@@ -18,7 +18,7 @@
 
   const STRATEGY_FORMAT = "ilovecat-battle-strategy";
   const EXPORT_FORMAT = "ilovecat-game-export";
-  const USERSCRIPT_VERSION = "0.5.3";
+  const USERSCRIPT_VERSION = "0.5.4";
   const STRATEGY_INDEX_URL = "https://github.com/ZeroJehovah/ilovecat-battle-sim-docs/raw/main/strategies/index.json";
   const STRATEGY_INDEX_TTL_MS = 5 * 60 * 1000;
   const ACTION_GAP_MS = 250;
@@ -1583,6 +1583,18 @@
     policy.walletTarget = clampInt(policy.walletTarget ?? 8, 1, 8, "policy.walletTarget");
     policy.economyFirst = policy.economyFirst !== false;
     policy.autoCannon = Boolean(policy.autoCannon);
+    policy.autoCannonAfter = policy.autoCannonAfter == null
+      ? 0
+      : finiteNumber(policy.autoCannonAfter, "policy.autoCannonAfter");
+    policy.autoCannonMinTargets = policy.autoCannonMinTargets == null
+      ? 0
+      : Number(policy.autoCannonMinTargets);
+    if (!Number.isInteger(policy.autoCannonMinTargets) || policy.autoCannonMinTargets < 0) {
+      throw new Error("policy.autoCannonMinTargets 必须是非负整数。");
+    }
+    policy.autoCannonFallbackAfter = policy.autoCannonFallbackAfter == null
+      ? policy.autoCannonAfter
+      : finiteNumber(policy.autoCannonFallbackAfter, "policy.autoCannonFallbackAfter");
     policy.automatic = policy.automatic !== false;
     policy.strictTimeline = Boolean(policy.strictTimeline);
     policy.timelineTolerance = policy.timelineTolerance == null
@@ -2442,7 +2454,7 @@
       }
       if (snapshot.money >= snapshot.walletCost && clickWallet()) return true;
       if (policy.economyFirst) {
-        return policy.autoCannon && snapshot.cannon >= CANNON_READY ? clickCannon() : false;
+        return shouldFireCannon(snapshot, policy) ? clickCannon() : false;
       }
     }
 
@@ -2456,7 +2468,7 @@
           executor.sequenceIndex++;
           return true;
         }
-        return policy.autoCannon && snapshot.cannon >= CANNON_READY ? clickCannon() : false;
+        return shouldFireCannon(snapshot, policy) ? clickCannon() : false;
       }
     }
     for (const id of policy.priority) {
@@ -2472,8 +2484,44 @@
         if (outcome) return true;
       }
     }
-    return policy.autoCannon && snapshot.cannon >= CANNON_READY ? clickCannon() : false;
+    return shouldFireCannon(snapshot, policy) ? clickCannon() : false;
   }
+
+  // testable:shouldFireCannon
+  function shouldFireCannon(snapshot, policy) {
+    if (!policy.autoCannon || Number(snapshot.cannon ?? 0) < CANNON_READY) return false;
+    if (Number(snapshot.time ?? 0) < policy.autoCannonAfter) return false;
+    if (policy.autoCannonMinTargets <= 0) return true;
+    const targetCount = cannonTargetCount(snapshot);
+    if (targetCount != null) return targetCount >= policy.autoCannonMinTargets;
+    return Number(snapshot.time ?? 0) >= policy.autoCannonFallbackAfter;
+  }
+  // end testable:shouldFireCannon
+
+  // testable:cannonTargetCount
+  function cannonTargetCount(snapshot) {
+    if (Number.isFinite(snapshot?.cannonTargets)) return Math.max(0, Number(snapshot.cannonTargets));
+    if (!Array.isArray(snapshot?.units)) return null;
+    return snapshot.units.filter((unit) =>
+      unit &&
+      unit.side === "mouse" &&
+      !unit.dead &&
+      Number(unit.x) > 455
+    ).length;
+  }
+  // end testable:cannonTargetCount
+
+  // testable:battleUnitsFromReactValue
+  function battleUnitsFromReactValue(value) {
+    const units = Array.isArray(value?.units)
+      ? value.units
+      : Array.isArray(value?.current?.units)
+        ? value.current.units
+        : null;
+    if (!units) return null;
+    return units.some((unit) => unit?.side === "cat" || unit?.side === "mouse") ? units : null;
+  }
+  // end testable:battleUnitsFromReactValue
 
   function scheduleMiss(snapshot, action) {
     const policy = executor.policy;
@@ -2685,10 +2733,12 @@
     }
     if (policy.autoCannon) {
       const cannon = Number(snapshot.cannon ?? 0);
-      add(
-        cannon >= CANNON_READY ? now : now + (CANNON_READY - cannon) * 30,
-        cannon >= CANNON_READY ? "猫爪炮已充满" : "猫爪炮",
-      );
+      const readyAt = cannon >= CANNON_READY ? now : now + (CANNON_READY - cannon) * 30;
+      const windowAt = Math.max(readyAt, policy.autoCannonAfter);
+      const targets = cannonTargetCount(snapshot);
+      if (now < windowAt) add(windowAt, "炮击窗口");
+      else if (policy.autoCannonMinTargets > 0 && targets == null) add(policy.autoCannonFallbackAfter, "炮击兜底");
+      else if (shouldFireCannon(snapshot, policy)) add(now, "炮击目标已出现");
     }
     return earliestCandidate(candidates);
   }
@@ -2776,7 +2826,10 @@
     } else if (speed != null && speed !== 1) {
       speedNote = `\n提示：当前为 ${speed}× 倍速；动作节流按真实时间，精确复刻建议 1×。`;
     }
-    const status = `运行中 t=${snapshot.time.toFixed(2)}s  钱包 ${snapshot.walletLevel}/${policy.walletTarget}${sequence}  金币 ${Math.floor(snapshot.money)}  场上 ${snapshot.cats}/20${speedText}\n${counts}${speedNote}`;
+    const cannonStatus = policy.autoCannon
+      ? `炮击 ${shouldFireCannon(snapshot, policy) ? "目标就绪" : "待命"}`
+      : "炮击关闭";
+    const status = `运行中 t=${snapshot.time.toFixed(2)}s  钱包 ${snapshot.walletLevel}/${policy.walletTarget}${sequence}  金币 ${Math.floor(snapshot.money)}  场上 ${snapshot.cats}/20  ${cannonStatus}${speedText}\n${counts}${speedNote}`;
     if (status !== executor.lastStatus) {
       executor.lastStatus = status;
       setRunStatus(status);
@@ -2800,6 +2853,7 @@
     if (!fiberKey) return { context: null, snapshot: null };
     let context = null;
     let snapshot = null;
+    let battleUnits = null;
     let fiber = screen[fiberKey];
     let depth = 0;
     while (fiber && depth++ < 40) {
@@ -2830,15 +2884,20 @@
         let hookIndex = 0;
         while (hook && hookIndex++ < 160) {
           const value = hook.memoizedState;
+          battleUnits ??= battleUnitsFromReactValue(value);
           if (isSnapshot(value)) {
             snapshot = value;
-            break;
+            if (battleUnits) break;
           }
           hook = hook.next;
         }
       }
-      if (context && snapshot) break;
+      if (context && snapshot && battleUnits) break;
       fiber = fiber.return;
+    }
+    if (snapshot && !Number.isFinite(snapshot.cannonTargets)) {
+      const targets = cannonTargetCount({ cannonTargets: snapshot.cannonTargets, units: battleUnits });
+      if (targets != null) snapshot = { ...snapshot, cannonTargets: targets };
     }
     return { context, snapshot };
   }

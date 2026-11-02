@@ -29,7 +29,7 @@ test("the userscript is syntactically valid and exposes both workflows", () => {
   assert.match(source, /@grant\s+GM_xmlhttpRequest/);
   assert.match(source, /@connect\s+github\.com/);
   assert.match(source, /@connect\s+raw\.githubusercontent\.com/);
-  assert.match(source, /USERSCRIPT_VERSION = "0\.5\.3"/);
+  assert.match(source, /USERSCRIPT_VERSION = "0\.5\.4"/);
   assert.match(source, /<div class="title">喵喵的逆袭工具 <span class="version">v\$\{USERSCRIPT_VERSION\}<\/span><\/div>/);
   assert.match(source, /ilovecat-game-export/);
   assert.match(source, /ilovecat-battle-strategy/);
@@ -103,6 +103,9 @@ test("the userscript is syntactically valid and exposes both workflows", () => {
   assert.match(source, /new pageWindow\.KeyboardEvent\("keydown"/);
   assert.match(source, /return pressDeployKey\(slot, context\)/);
   assert.match(source, /policy\.actionGap/);
+  assert.match(source, /autoCannonAfter/);
+  assert.match(source, /autoCannonMinTargets/);
+  assert.match(source, /autoCannonFallbackAfter/);
   assert.match(source, /节奏会不一致/);
   assert.match(source, /include-catalog/);
   assert.match(source, /include-owned/);
@@ -163,6 +166,42 @@ test("the userscript is syntactically valid and exposes both workflows", () => {
   assert.match(source, /复制所选 JSON/);
   assert.match(source, /下载所选 JSON/);
   assert.doesNotMatch(source, /download-snapshot/);
+});
+
+test("automatic cannon waits for late live targets with a timed fallback", () => {
+  const cannonTargetCount = markedFunction("cannonTargetCount");
+  const shouldFireCannon = markedFunction("shouldFireCannon", {
+    CANNON_READY: 1,
+    cannonTargetCount,
+  });
+  const policy = {
+    autoCannon: true,
+    autoCannonAfter: 800,
+    autoCannonMinTargets: 1,
+    autoCannonFallbackAfter: 840,
+  };
+  const base = { time: 800, cannon: 1, cannonTargets: 0 };
+
+  assert.equal(shouldFireCannon(base, policy), false);
+  assert.equal(shouldFireCannon({ ...base, cannonTargets: 1 }, policy), true);
+  assert.equal(shouldFireCannon({ ...base, time: 799, cannonTargets: 1 }, policy), false);
+  assert.equal(shouldFireCannon({ ...base, cannon: 0.99, cannonTargets: 1 }, policy), false);
+  assert.equal(shouldFireCannon({ ...base, time: 839, cannonTargets: undefined }, policy), false);
+  assert.equal(shouldFireCannon({ ...base, time: 840, cannonTargets: undefined }, policy), true);
+});
+
+test("battle units can be read from the React engine ref", () => {
+  const battleUnitsFromReactValue = markedFunction("battleUnitsFromReactValue");
+  const cannonTargetCount = markedFunction("cannonTargetCount");
+  const units = [
+    { side: "mouse", dead: 0, x: 500 },
+    { side: "mouse", dead: 0, x: 455 },
+    { side: "mouse", dead: 0.2, x: 510 },
+    { side: "cat", dead: 0, x: 800 },
+  ];
+  assert.equal(battleUnitsFromReactValue({ current: { units } }), units);
+  assert.equal(battleUnitsFromReactValue({ units: [{ cat_id: "c1" }] }), null);
+  assert.equal(cannonTargetCount({ units }), 1);
 });
 
 test("the online strategy index is strict and is cross-checked against each selected strategy", () => {

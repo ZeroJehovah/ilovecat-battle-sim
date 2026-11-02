@@ -47,6 +47,8 @@ export class AutoPolicy {
     this.fallbackAfter = Number(options.fallbackAfter ?? Number.POSITIVE_INFINITY);
     this.fallbackPriority = options.fallbackPriority ?? [];
     this.autoCannon = Boolean(options.autoCannon);
+    this.autoCannonAfter = Number(options.autoCannonAfter ?? 0);
+    this.autoCannonMinTargets = Number(options.autoCannonMinTargets ?? 0);
     this.automatic = options.automatic !== false;
     this.actions = [...(options.actions ?? [])].sort((a, b) => Number(a.at) - Number(b.at));
     this.nextAction = 0;
@@ -57,6 +59,12 @@ export class AutoPolicy {
     this.observationDelay = Number(options.observationDelay ?? 0);
     if (!Number.isFinite(this.observationDelay) || this.observationDelay < 0) {
       throw new Error("observationDelay must be a non-negative number of seconds");
+    }
+    if (!Number.isFinite(this.autoCannonAfter) || this.autoCannonAfter < 0) {
+      throw new Error("autoCannonAfter must be a non-negative number of seconds");
+    }
+    if (!Number.isInteger(this.autoCannonMinTargets) || this.autoCannonMinTargets < 0) {
+      throw new Error("autoCannonMinTargets must be a non-negative integer");
     }
     this.nextActAt = 0;
 
@@ -89,6 +97,13 @@ export class AutoPolicy {
   deployId(engine, id) {
     const slot = this.slotFor(engine, id);
     return slot >= 0 && engine.deploy(slot);
+  }
+
+  shouldFireCannon(engine) {
+    return this.autoCannon &&
+      engine.time >= this.autoCannonAfter &&
+      engine.cannonCharge >= 30 &&
+      engine.cannonTargetCount >= this.autoCannonMinTargets;
   }
 
   applyScheduled(engine) {
@@ -125,7 +140,7 @@ export class AutoPolicy {
       }
       if (engine.money >= engine.walletCost && engine.upgradeWallet()) return true;
       if (this.economyFirst) {
-        if (this.autoCannon && engine.cannonCharge >= 30) return engine.fireCannon();
+        if (this.shouldFireCannon(engine)) return engine.fireCannon();
         return false;
       }
     }
@@ -138,7 +153,7 @@ export class AutoPolicy {
           this.sequenceIndex++;
           return true;
         }
-        if (this.autoCannon && engine.cannonCharge >= 30) return engine.fireCannon();
+        if (this.shouldFireCannon(engine)) return engine.fireCannon();
         return false;
       }
     }
@@ -155,7 +170,7 @@ export class AutoPolicy {
       }
     }
 
-    if (this.autoCannon && engine.cannonCharge >= 30) return engine.fireCannon();
+    if (this.shouldFireCannon(engine)) return engine.fireCannon();
     return false;
   }
 }
@@ -167,6 +182,7 @@ function captureObservation(engine) {
     walletLevel: engine.walletLevel,
     walletCost: engine.walletCost,
     cannonCharge: engine.cannonCharge,
+    cannonTargetCount: engine.cannonTargetCount,
     catCount: engine.catCount,
     cooldowns: engine.slotCooldowns.slice(),
     onField: engine.catsOnField(),
@@ -186,6 +202,7 @@ class ObservedEngine {
   get walletLevel() { return this.state.walletLevel; }
   get walletCost() { return this.state.walletCost; }
   get cannonCharge() { return this.state.cannonCharge; }
+  get cannonTargetCount() { return this.state.cannonTargetCount; }
   get catCount() { return this.state.catCount; }
   get slotCooldowns() { return this.state.cooldowns; }
   get result() { return this.state.result; }

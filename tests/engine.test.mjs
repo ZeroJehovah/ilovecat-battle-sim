@@ -209,6 +209,33 @@ test("deploySequence may fire a charged cannon while saving for the next unit", 
   assert.equal(engine.actions.length, 1);
 });
 
+test("automatic cannon can wait for its time window and live targets", () => {
+  const team = [{ id: "c7", level: 1 }];
+  const engine = engineFor(team, bareStage());
+  engine.cannonCharge = 30;
+  const policy = new AutoPolicy(team, {
+    walletTarget: 1,
+    targetCounts: { c7: 0 },
+    autoCannon: true,
+    autoCannonAfter: 800,
+    autoCannonMinTargets: 1,
+  });
+
+  engine.time = 799;
+  engine.spawnMouse(mouse("m1"), 500, 1);
+  assert.equal(policy.act(engine), false);
+
+  engine.time = 800;
+  engine.units[0].x = 455;
+  assert.equal(policy.act(engine), false);
+  assert.equal(engine.cannonTargetCount, 0);
+
+  engine.units[0].x = 456;
+  assert.equal(policy.act(engine), true);
+  assert.equal(engine.actions[0].type, "cannon");
+  assert.equal(engine.cannonTargetCount, 0);
+});
+
 test("actionGap enforces the real page-action interval in simulation", () => {
   const result = simulate({
     snapshot,

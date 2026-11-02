@@ -16,6 +16,8 @@ https://raw.githubusercontent.com/ZeroJehovah/ilovecat-battle-sim/main/tools/ilo
 
 顶部把原“执行策略”拆为“在线策略”和“本地策略”两个页签。在线页从私有 docs 仓库的 strategies/index.json 读取策略；加载时居中显示提示且隐藏刷新按钮，加载后刷新图标与关卡标签排在同一行，每次只列出一个关卡的策略。未选中策略只显示标题与标签，选中后才展开按 C/B/A/S 排序、按等级着色的配队和说明。在线列表不显示索引统计行。本地页只允许选择 JSON 文件。自动开始战斗和自动倍速默认勾选，自动开战只在用户点“开始执行”后触发。
 
+0.5.4 支持按时间和炮口目标触发猫爪炮：`autoCannonAfter` 控制最早开炮时间，`autoCannonMinTargets` 要求 `x > 455` 的存活老鼠达到指定数量。执行器只读 React 组件 `useRef` 中的战斗实例 `units` 来数目标；万一游戏改版读不到单位位置，再以 `autoCannonFallbackAfter` 作为后期兜底。
+
 0.5.3 “开始执行”复用选中策略后的同一套校验，并在校验失败信息旁增加 Lucide 刷新图标按钮，允许重新校验。
 
 0.5.2 将在线列表的索引统计提示行移除；加载时居中显示占位提示，刷新按钮在索引读取完成或失败后才显示。
@@ -96,6 +98,9 @@ jq '.snapshot' ilovecat-export-YYYYMMDD-HHMMSS.json > snapshot.json
     "fallbackAfter": 775,
     "fallbackPriority": [],
     "autoCannon": true,
+    "autoCannonAfter": 600,
+    "autoCannonMinTargets": 1,
+    "autoCannonFallbackAfter": 840,
     "automatic": true,
     "strictTimeline": false,
     "timelineTolerance": 0.25,
@@ -111,7 +116,7 @@ jq '.snapshot' ilovecat-export-YYYYMMDD-HHMMSS.json > snapshot.json
 - `deploySequence` 是钱包达标后严格执行的上场顺序，允许重复 id；下一只金币不足或槽位冷却时原地等待，不会改买 `priority` 或其他便宜猫；等待期间仍可发射已充能的猫爪炮；序列完成后才进入目标存活数维护；
 - 钱包达标后，按 `priority` 检查目标存活数，槽位冷却时跳过并检查下一只；
 - 到达 `fallbackAfter` 后，在目标无法补位时使用 `fallbackPriority` 填场；
-- 自动猫爪炮只会在没有更高优先级操作时发射。
+- 自动猫爪炮只会在没有更高优先级操作时发射；`autoCannonAfter` 之前会保持蓄能，之后还要满足 `autoCannonMinTargets` 个 `x > 455` 的存活目标。页面读不到单位位置时才使用 `autoCannonFallbackAfter` 兜底，不再把“关闭炮击”当成唯一低风险选择。
 
 `actions` 可覆盖自动决定，支持 `deploy`、`wallet`、`cannon` 和 `wait`：
 
