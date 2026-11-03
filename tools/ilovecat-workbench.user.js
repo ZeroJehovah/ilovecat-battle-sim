@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         喵喵的逆袭 · 数据导出与策略执行
 // @namespace    https://github.com/ZeroJehovah/ilovecat-battle-sim
-// @version      0.5.4
+// @version      0.5.5
 // @description  按范围只读导出战斗数据与 JS，并从在线索引或本地文件选择策略操作战斗页面
 // @match        https://api.ilovecat520.me/*
 // @updateURL    https://raw.githubusercontent.com/ZeroJehovah/ilovecat-battle-sim/main/tools/ilovecat-workbench.user.js
@@ -18,7 +18,7 @@
 
   const STRATEGY_FORMAT = "ilovecat-battle-strategy";
   const EXPORT_FORMAT = "ilovecat-game-export";
-  const USERSCRIPT_VERSION = "0.5.4";
+  const USERSCRIPT_VERSION = "0.5.5";
   const STRATEGY_INDEX_URL = "https://github.com/ZeroJehovah/ilovecat-battle-sim-docs/raw/main/strategies/index.json";
   const STRATEGY_INDEX_TTL_MS = 5 * 60 * 1000;
   const ACTION_GAP_MS = 250;
@@ -1461,11 +1461,11 @@
         const catId = String(cat?.id ?? "").trim();
         const name = String(cat?.name ?? "").trim();
         const level = Number(cat?.level);
-        if (!/^[a-z0-9]+$/.test(catId) || !name || !Number.isInteger(level)) {
+        if (!/^[a-z0-9]+$/.test(catId) || !name || !Number.isInteger(level) || level < 1 || level > 999) {
           throw new Error(`${label}.team[${catIndex}] 无效。`);
         }
-        if (levels[catId] !== level) {
-          throw new Error(`${label}.team 的 ${catId} 等级与当前阵容基准不一致。`);
+        if (!(levels[catId] >= level)) {
+          throw new Error(`${label}.team 的 ${catId} 当前阵容等级未达到策略最低要求 ${level}。`);
         }
         return { id: catId, name, level };
       });
@@ -1508,7 +1508,7 @@
     }
     for (const [id, level] of indexedTeam) {
       if (actualTeam.get(id) !== level) throw new Error(`在线策略的 ${id} 等级与索引不一致。`);
-      if (index.roster.levels[id] !== level) throw new Error(`在线策略的 ${id} 等级不符合当前阵容基准。`);
+      if (!(index.roster.levels[id] >= level)) throw new Error(`在线策略的 ${id} 当前阵容等级未达到策略最低要求 ${level}。`);
     }
     return true;
   }
@@ -1858,15 +1858,15 @@
       } else {
         output.push({ type: "success", text: "策略未限定配队。" });
       }
-      const levelMismatch = team.filter((entry) => {
-        return actual.has(String(entry.id)) && Number(actual.get(String(entry.id)).level) !== Number(entry.level);
+      const insufficientLevels = team.filter((entry) => {
+        return actual.has(String(entry.id)) && !(Number(actual.get(String(entry.id)).level) >= Number(entry.level));
       });
-      if (levelMismatch.length) {
-        const details = levelMismatch.map((entry) => {
+      if (insufficientLevels.length) {
+        const details = insufficientLevels.map((entry) => {
           const name = catName(entry.id) || "未知猫咪";
-          return name + " 策略 " + entry.level + "，当前 " + actual.get(String(entry.id)).level;
+          return name + " 最低需要 " + entry.level + "，当前 " + (actual.get(String(entry.id)).level ?? "未知");
         });
-        output.push({ type: "warning", text: "等级不符：" + details.join("；") + "。" });
+        output.push({ type: "error", text: "等级未达要求：" + details.join("；") + "。" });
       }
       return output;
     };
@@ -1927,6 +1927,7 @@
   }
   // end testable:buildUiValidationResults
 
+  // testable:validateStrategy
   function validateStrategy(strategy, runtime, names = null) {
     const messages = [`策略：${strategy.name || "未命名"}`];
     const nameMap = names ?? new Map((runtime.context?.team ?? []).map((entry) => [entry.id, entry.name]));
@@ -1967,9 +1968,10 @@
         hasError = true;
       }
       const actualLevels = new Map(runtime.context.team.map((entry) => [entry.id, entry.level]));
-      const levelMismatch = strategy.team.filter((entry) => actualIds.has(entry.id) && actualLevels.get(entry.id) !== entry.level);
-      if (levelMismatch.length) {
-        messages.push(`警告：等级不一致：${levelMismatch.map((entry) => `${describe(entry.id)} 需要 ${entry.level}，当前 ${actualLevels.get(entry.id)}`).join("；")}。`);
+      const insufficientLevels = strategy.team.filter((entry) => actualIds.has(entry.id) && !(Number(actualLevels.get(entry.id)) >= Number(entry.level)));
+      if (insufficientLevels.length) {
+        messages.push(`错误：等级未达要求：${insufficientLevels.map((entry) => `${describe(entry.id)} 最低需要 ${entry.level}，当前 ${actualLevels.get(entry.id) ?? "未知"}`).join("；")}。`);
+        hasError = true;
       }
     }
     if (strategy.items) {
@@ -1984,6 +1986,7 @@
     messages.push(hasError ? "校验失败。" : "校验通过；执行器仍需在战斗进行中运行。");
     return messages;
   }
+  // end testable:validateStrategy
 
   function findPreparationRuntime(strategy) {
     const stageName = typeof strategy.stage?.name === "string" ? strategy.stage.name.trim() : "";
@@ -2061,7 +2064,7 @@
         id: key,
         name: String(cat?.name ?? key),
         tier: String(cat?.tier ?? ""),
-        level: Number(unit?.level ?? 1),
+        level: unit?.level == null ? null : Number(unit.level),
       };
     });
     const items = [...dialog.querySelectorAll("label.cat-battle-item-pick")].map((label) => {
@@ -2872,7 +2875,7 @@
                 tier: String(cat.tier ?? ""),
                 cost: Number(cat.cost ?? 0),
                 cooldown: Number(cat.cooldown ?? 0),
-                level: Number(entry?.level ?? 1),
+                level: entry?.level == null ? null : Number(entry.level),
               };
             }).filter((entry) => entry.id),
             items: Array.isArray(props.items) ? props.items : [],

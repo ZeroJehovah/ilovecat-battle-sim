@@ -29,7 +29,7 @@ test("the userscript is syntactically valid and exposes both workflows", () => {
   assert.match(source, /@grant\s+GM_xmlhttpRequest/);
   assert.match(source, /@connect\s+github\.com/);
   assert.match(source, /@connect\s+raw\.githubusercontent\.com/);
-  assert.match(source, /USERSCRIPT_VERSION = "0\.5\.4"/);
+  assert.match(source, /USERSCRIPT_VERSION = "0\.5\.5"/);
   assert.match(source, /<div class="title">喵喵的逆袭工具 <span class="version">v\$\{USERSCRIPT_VERSION\}<\/span><\/div>/);
   assert.match(source, /ilovecat-game-export/);
   assert.match(source, /ilovecat-battle-strategy/);
@@ -204,7 +204,7 @@ test("battle units can be read from the React engine ref", () => {
   assert.equal(cannonTargetCount({ units }), 1);
 });
 
-test("the online strategy index is strict and is cross-checked against each selected strategy", () => {
+test("the online index accepts minimum levels while strategy metadata must match exactly", () => {
   const parseStrategyIndex = markedFunction("parseStrategyIndex");
   const validateIndexedStrategy = markedFunction("validateIndexedStrategy");
   const file = "boss.user-strategy.json";
@@ -242,21 +242,37 @@ test("the online strategy index is strict and is cross-checked against each sele
     team: [{ id: "c7", level: 48 }, { id: "b4", level: 16 }],
   };
   assert.equal(validateIndexedStrategy(index, index.strategies[0], strategy), true);
-  assert.throws(
-    () => validateIndexedStrategy(index, index.strategies[0], {
-      ...strategy,
-      team: [{ id: "c7", level: 48 }, { id: "b4", level: 17 }],
-    }),
-    /等级与索引不一致/,
-  );
+  for (const level of [15, 17]) {
+    assert.throws(
+      () => validateIndexedStrategy(index, index.strategies[0], {
+        ...strategy,
+        team: [{ id: "c7", level: 48 }, { id: "b4", level }],
+      }),
+      /等级与索引不一致/,
+    );
+  }
 
   const external = JSON.parse(rawIndex);
   external.strategies[0].rawUrl = "https://example.test/boss.json";
   assert.throws(() => parseStrategyIndex(JSON.stringify(external), rawRoot), /rawUrl 必须指向私有策略库/);
 
-  const stale = JSON.parse(rawIndex);
-  stale.strategies[0].team[0].level = 47;
-  assert.throws(() => parseStrategyIndex(JSON.stringify(stale), rawRoot), /等级与当前阵容基准不一致/);
+  const upgraded = JSON.parse(rawIndex);
+  upgraded.roster.levels.c7 = 49;
+  const upgradedIndex = parseStrategyIndex(JSON.stringify(upgraded), rawRoot);
+  assert.equal(validateIndexedStrategy(upgradedIndex, upgradedIndex.strategies[0], strategy), true);
+
+  for (const level of [47, undefined]) {
+    const insufficient = JSON.parse(rawIndex);
+    insufficient.roster.levels.c7 = level;
+    assert.throws(() => parseStrategyIndex(JSON.stringify(insufficient), rawRoot), /未达到策略最低要求 48/);
+    assert.throws(() => validateIndexedStrategy(insufficient, index.strategies[0], strategy), /未达到策略最低要求 48/);
+  }
+
+  for (const level of [0, -1, 1.5, 1000]) {
+    const invalid = JSON.parse(rawIndex);
+    invalid.strategies[0].team[0].level = level;
+    assert.throws(() => parseStrategyIndex(JSON.stringify(invalid), rawRoot), /team\[0\] 无效/);
+  }
 });
 
 test("online strategy filters expose one stage at a time in index order", () => {
@@ -356,6 +372,68 @@ test("validation reports stage, team and item errors separately", () => {
   assert.match(results[1].text, /策略关卡 id 20/);
   assert.match(results[2].text, /^配队不符：.*白糰子\(12\)/);
   assert.match(results[3].text, /^道具不足：/);
+});
+
+test("preparation and active battle validation enforce each cat's minimum level", () => {
+  const buildUiValidationResults = markedFunction("buildUiValidationResults", {
+    validatePreparationStage: markedFunction("validatePreparationStage"),
+  });
+  const strategy = {
+    stageId: 20,
+    team: [{ id: "c7", level: 48 }, { id: "c1", level: 12 }],
+    items: [],
+  };
+  const cats = new Map([["c7", "虎斑"], ["c1", "白糰子"]]);
+  for (const mode of ["preparation", "battle"]) {
+    for (const level of [48, 49, 47, undefined, null]) {
+      const context = {
+        stageId: 20,
+        stageMatch: true,
+        team: [{ id: "c7", level }, { id: "c1", level: 99 }],
+        items: [],
+      };
+      const results = buildUiValidationResults(
+        strategy,
+        mode === "battle" ? { context } : null,
+        mode === "preparation" ? context : null,
+        cats,
+      );
+      if (level === 48 || level === 49) {
+        assert.ok(results.every((result) => result.type === "success"), `${mode}: level ${level}`);
+        assert.equal(results.at(-1).text, "校验通过。");
+      } else {
+        const errors = results.filter((result) => result.type === "error");
+        assert.equal(errors.length, 1, `${mode}: level ${level}`);
+        assert.match(errors[0].text, /等级未达要求：虎斑 最低需要 48，当前/);
+        assert.doesNotMatch(errors[0].text, /白糰子/);
+        assert.ok(!results.some((result) => result.text === "校验通过。"));
+      }
+    }
+  }
+});
+
+test("the first live snapshot rechecks minimum levels before executing actions", () => {
+  const validateStrategy = markedFunction("validateStrategy", { ACTION_GAP_MS: 250, ITEM_NAMES: {} });
+  const strategy = {
+    stageId: 20,
+    team: [{ id: "c7", level: 48 }, { id: "c1", level: 12 }],
+    items: [],
+    policy: { openers: [], priority: [], fallbackPriority: [], deploySequence: [], targetCounts: {}, actions: [] },
+  };
+  for (const level of [48, 49, 47, undefined, null]) {
+    const messages = validateStrategy(strategy, { context: {
+      stageId: 20,
+      team: [{ id: "c7", level }, { id: "c1", level: 99 }],
+      items: [],
+    } });
+    if (level === 48 || level === 49) {
+      assert.ok(!messages.some((line) => /^(错误|警告)/.test(line)));
+      assert.match(messages.at(-1), /^校验通过/);
+    } else {
+      assert.ok(messages.some((line) => /^错误：等级未达要求：c7 最低需要 48/.test(line)));
+      assert.equal(messages.at(-1), "校验失败。");
+    }
+  }
 });
 
 test("the export scope lists campaign, endless, daily and active raid stages", () => {
