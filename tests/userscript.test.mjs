@@ -29,7 +29,7 @@ test("the userscript is syntactically valid and exposes both workflows", () => {
   assert.match(source, /@grant\s+GM_xmlhttpRequest/);
   assert.match(source, /@connect\s+github\.com/);
   assert.match(source, /@connect\s+raw\.githubusercontent\.com/);
-  assert.match(source, /USERSCRIPT_VERSION = "0\.5\.5"/);
+  assert.match(source, /USERSCRIPT_VERSION = "0\.5\.6-SNAPSHOT"/);
   assert.match(source, /<div class="title">喵喵的逆袭工具 <span class="version">v\$\{USERSCRIPT_VERSION\}<\/span><\/div>/);
   assert.match(source, /ilovecat-game-export/);
   assert.match(source, /ilovecat-battle-strategy/);
@@ -204,7 +204,7 @@ test("battle units can be read from the React engine ref", () => {
   assert.equal(cannonTargetCount({ units }), 1);
 });
 
-test("the online index accepts minimum levels while strategy metadata must match exactly", () => {
+test("the online index lists upgrade plans while strategy metadata must match exactly", () => {
   const parseStrategyIndex = markedFunction("parseStrategyIndex");
   const validateIndexedStrategy = markedFunction("validateIndexedStrategy");
   const file = "boss.user-strategy.json";
@@ -264,8 +264,24 @@ test("the online index accepts minimum levels while strategy metadata must match
   for (const level of [47, undefined]) {
     const insufficient = JSON.parse(rawIndex);
     insufficient.roster.levels.c7 = level;
-    assert.throws(() => parseStrategyIndex(JSON.stringify(insufficient), rawRoot), /未达到策略最低要求 48/);
-    assert.throws(() => validateIndexedStrategy(insufficient, index.strategies[0], strategy), /未达到策略最低要求 48/);
+    const plannedIndex = parseStrategyIndex(JSON.stringify(insufficient), rawRoot);
+    assert.equal(plannedIndex.strategies[0].team[0].level, 48);
+    assert.equal(plannedIndex.roster.levels.c7, level);
+    assert.equal(validateIndexedStrategy(plannedIndex, plannedIndex.strategies[0], strategy), true);
+
+    const validateStrategy = markedFunction("validateStrategy", { ACTION_GAP_MS: 250, ITEM_NAMES: {} });
+    for (const liveLevel of [47, undefined, 48, 49]) {
+      const messages = validateStrategy({
+        ...strategy,
+        items: [],
+        policy: { actions: [], openers: [], deploySequence: [], priority: [], targetCounts: {}, fallbackPriority: [] },
+      }, { context: {
+        stageId: strategy.stageId,
+        team: strategy.team.map((cat) => ({ ...cat, level: cat.id === "c7" ? liveLevel : cat.level })),
+        items: [],
+      } });
+      assert.equal(messages.some((message) => /^错误：等级未达要求/.test(message)), !(liveLevel >= 48));
+    }
   }
 
   for (const level of [0, -1, 1.5, 1000]) {
