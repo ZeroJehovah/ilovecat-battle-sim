@@ -102,7 +102,7 @@ export class AutoPolicy {
   shouldFireCannon(engine) {
     return this.autoCannon &&
       engine.time >= this.autoCannonAfter &&
-      engine.cannonCharge >= 30 &&
+      engine.cannonCharge >= engine.cannonTime &&
       engine.cannonTargetCount >= this.autoCannonMinTargets;
   }
 
@@ -182,6 +182,7 @@ function captureObservation(engine) {
     walletLevel: engine.walletLevel,
     walletCost: engine.walletCost,
     cannonCharge: engine.cannonCharge,
+    cannonTime: engine.cannonTime,
     cannonTargetCount: engine.cannonTargetCount,
     catCount: engine.catCount,
     cooldowns: engine.slotCooldowns.slice(),
@@ -202,6 +203,7 @@ class ObservedEngine {
   get walletLevel() { return this.state.walletLevel; }
   get walletCost() { return this.state.walletCost; }
   get cannonCharge() { return this.state.cannonCharge; }
+  get cannonTime() { return this.state.cannonTime; }
   get cannonTargetCount() { return this.state.cannonTargetCount; }
   get catCount() { return this.state.catCount; }
   get slotCooldowns() { return this.state.cooldowns; }
@@ -223,6 +225,7 @@ export function simulate({
   stage = null,
   seed = 1,
   items = [],
+  teamSlots = null,
   policy = {},
   maxTime = null,
   recordEvents = false,
@@ -238,6 +241,7 @@ export function simulate({
     team: normalizedTeam,
     seed,
     items,
+    teamSlots,
     onEvent: recordEvents ? (type, payload) => events.push({ type, ...payload }) : null,
   });
   const controller = new AutoPolicy(normalizedTeam, policy);
@@ -268,6 +272,7 @@ export function simulate({
       timeLimit: selectedStage.time_limit,
     },
     result: engine.result === "playing" ? "limit" : engine.result,
+    teamSlots: engine.teamSlots,
     duration,
     round: Math.min(30, Math.floor(duration / 30) + 1),
     towerHp: Math.max(0, Math.round(engine.catBaseHp)),

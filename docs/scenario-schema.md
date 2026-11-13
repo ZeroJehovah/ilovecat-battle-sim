@@ -13,6 +13,7 @@
   "name": "candidate-name",
   "stageId": 9101,
   "stage": null,
+  "teamSlots": null,
   "team": [
     { "id": "c2", "level": 40 },
     { "id": "s4", "level": 17 }
@@ -41,11 +42,23 @@
 
 - `stageId`: id from the captured catalog. Omit it to use `.stage` (the captured endless stage, currently 9101).
 - `stage`: optional inline stage object. When present it takes precedence over `stageId`; use this for event stages that are not part of the captured catalog.
-- `team`: at most the catalog's `team_size`, normally 10. Each entry is a unique cat id plus a level. Repeated copies on the field come from repeatedly deploying one slot.
-- `items`: any of `start_coins`, `fast_coins`, `strong_base`, `cannon_ready`, `rally`.
+- `team`: each entry is a unique cat id plus a level. Repeated copies on the field come from repeatedly deploying one slot.
+- `teamSlots`: optional team slot cap. It defaults to the catalog's `team_size` (currently 10). For current endless stage `9101`, set it to `11` to model the borrowed house-cat slot added on 2026-11-12. The extra slot is an explicit offline assumption; the snapshot does not capture lender availability or entitlement, and the simulator rejects an 11-slot campaign team.
+- `items`: any of `start_coins`, `fast_coins`, `strong_base`, `cannon_ready`, `rally`, plus upgrade tokens `cannon_lv:N` and `base_lv:N` where `N` is 0–10. `cannon_lv` increases cannon damage by 20 and reduces charge time by 0.5 seconds per level; `base_lv` increases base cat-tower health by 15% of the level-0 value per level.
 - `maxTime`: stop the simulation early. The reported `duration` never exceeds this value. Use `null` or omit it for the stage time limit.
 - `seed` and `seedStart`: optional defaults for a single run and a batch.
 - `runs`: optional default run count when `--runs` is absent.
+
+## Current release rules
+
+The engine always advances in fixed `0.02`-second steps. The 2026-11-13 snapshot and mechanics include:
+
+- dodge before damage for both cats and mice, followed by armor reduction;
+- full-moon mice restoring 1% of maximum HP per second;
+- cat-tower level `N` multiplying base HP by `1 + 0.15 × N`;
+- paw cannon level `N` dealing `150 + 20 × N` damage and charging in `30 - 0.5 × N` seconds;
+- Desert Traveler burn ticks, Gear Artificer turrets, and the released chapter 3–4 traits, summons and stage twists described in `../docs/战斗机制与实现依据.md`;
+- the optional 11th endless slot through `teamSlots: 11`.
 
 ## Automatic policy
 
@@ -85,6 +98,7 @@ Supported types are `deploy`, `wallet`, `cannon`, and `wait`. Failed actions rem
 
 ```bash
 node src/cli.mjs run scenario.json --seed 7 --events
+node src/cli.mjs run scenario.json --seed 7 --team-slots 11
 node src/cli.mjs run scenario.json --seed 7 --trace --output trace.json
 node src/cli.mjs batch scenario.json --seed-start 1 --runs 100 --jobs 8
 node src/cli.mjs compare scenarios.json --runs 50 --jobs 8 --output result.md
@@ -105,7 +119,7 @@ A single run reports:
 - `result`: `lost`, `timeup`, `won`, or `limit` when `maxTime` is reached first.
 - `duration`: simulated battle seconds.
 - `round`: `min(30, floor(duration / 30) + 1)` for the endless display convention.
-- `towerHp`, `towerMaxHp`, `enemyBaseHp`, `money`, `walletLevel`, `field`, and `fieldCount`.
+- `teamSlots`, `towerHp`, `towerMaxHp`, `enemyBaseHp`, `money`, `walletLevel`, `field`, and `fieldCount`.
 - `bossDamage`: direct damage dealt to the stage's declared boss. On a timed boss stage that cannot be defeated in one attempt, this is the primary score metric.
 - `stats`: deployments, mouse kills, cat losses, and rage triggers.
 - `telemetry`: damage, kills, healing, deployment counts, deaths, maximum simultaneous copies, and first deployment/death times by cat id.
@@ -118,6 +132,8 @@ Batch output adds duration and boss-damage mean, minimum, P10, median, P90, maxi
 ## Validation limits
 
 - The snapshot captures current numeric data, not entitlement, expiry, feeding progress, inventory, or the saved team.
+- A `teamSlots: 11` run models a borrowed house cat only when the caller explicitly declares it. This does not prove that a lender or offer exists in the live game.
 - Battle items are modeled as battle effects only; their can cost and inventory are not enforced.
+- Current regression coverage targets the 40 public campaign stages and stage 9101. Chapter 10 and catalog-only later mice are not yet validated against released stages.
 - The simulator does not enforce UI key, network, or human reaction constraints. Automatic replacement is therefore optimistic.
 - A seed controls the client RNG sequence. It reproduces this simulator's rolls, not an unobserved server roll.

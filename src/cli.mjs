@@ -21,6 +21,7 @@ function usage() {
 Options:
   --snapshot <path>    Battle snapshot (default: data/snapshot.json)
   --stage-id <id>      Override the stage selected by the scenario
+  --team-slots <n>     Override team slots (11 includes a borrowed endless cat)
   --seed <n>           Seed for "run" (default: 1)
   --seed-start <n>     First seed for batch/compare (default: 1)
   --runs <n>           Number of seeds for batch/compare (default: 30)
@@ -102,10 +103,10 @@ function chunkSeeds(seeds, workers) {
   return chunks.filter((chunk) => chunk.length);
 }
 
-function runWorkerChunk(snapshot, scenario, seeds, stageId, stage, items, maxTime) {
+function runWorkerChunk(snapshot, scenario, seeds, stageId, stage, items, teamSlots, maxTime) {
   return new Promise((resolvePromise, reject) => {
     const worker = new Worker(new URL("./worker.mjs", import.meta.url), {
-      workerData: { snapshot, scenario, seeds, stageId, stage, items, maxTime },
+      workerData: { snapshot, scenario, seeds, stageId, stage, items, teamSlots, maxTime },
     });
     worker.once("message", (message) => {
       worker.terminate();
@@ -119,11 +120,11 @@ function runWorkerChunk(snapshot, scenario, seeds, stageId, stage, items, maxTim
   });
 }
 
-async function runBatch(snapshot, scenario, { seeds, jobs, stageId, stage, items, maxTime }) {
+async function runBatch(snapshot, scenario, { seeds, jobs, stageId, stage, items, teamSlots, maxTime }) {
   const workers = Math.max(1, Math.min(Number(jobs || cpus().length), seeds.length));
   const chunks = chunkSeeds(seeds, workers);
   const grouped = await Promise.all(
-    chunks.map((chunk) => runWorkerChunk(snapshot, scenario, chunk, stageId, stage, items, maxTime)),
+    chunks.map((chunk) => runWorkerChunk(snapshot, scenario, chunk, stageId, stage, items, teamSlots, maxTime)),
   );
   const runs = grouped.flat().sort((a, b) => a.seed - b.seed);
   return { aggregate: aggregate(runs), runs };
@@ -138,6 +139,7 @@ function commonScenarioContext(scenario, options) {
     stageId: options["stage-id"] ?? scenario.stageId ?? null,
     stage: scenario.stage ?? null,
     items: scenario.items ?? [],
+    teamSlots: options["team-slots"] ?? scenario.teamSlots ?? null,
     maxTime: scenario.maxTime ?? null,
   };
 }

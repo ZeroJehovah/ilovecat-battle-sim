@@ -1,7 +1,7 @@
 import { parentPort, workerData } from "node:worker_threads";
 import { simulate } from "./runner.mjs";
 
-const { snapshot, scenario, seeds, stageId, stage, items, maxTime } = workerData;
+const { snapshot, scenario, seeds, stageId, stage, items, teamSlots, maxTime } = workerData;
 const runs = [];
 try {
   for (const seed of seeds) {
@@ -13,6 +13,7 @@ try {
         stageId,
         stage,
         items,
+        teamSlots,
         seed,
         maxTime,
       }),

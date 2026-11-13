@@ -21,23 +21,27 @@ function engineFor(team, stage = bareStage(), options = {}) {
     team,
     seed: options.seed ?? 1,
     items: options.items ?? [],
+    teamSlots: options.teamSlots ?? null,
     onEvent: options.onEvent ?? null,
   });
 }
 
 test("snapshot contains the current catalog and endless wave data", () => {
-  assert.equal(snapshot.catalog.cats.length, 29);
-  assert.equal(snapshot.catalog.mice.length, 28);
+  assert.equal(snapshot.catalog.cats.length, 32);
+  assert.equal(snapshot.catalog.mice.length, 56);
+  assert.equal(snapshot.catalog.stages.length, 40);
   assert.equal(snapshot.stage.id, 9101);
+  assert.equal(snapshot.stage.modifier, "moon");
+  assert.equal(snapshot.endlessMeta.season, "2026-11-09");
   assert.equal(snapshot.stage.time_limit, 900);
   assert.equal(snapshot.stage.waves.length, 84);
 
-  const shadowWave = snapshot.stage.waves.find((wave) => wave.at === 745);
-  assert.deepEqual(shadowWave.traits, ["rage"]);
-  assert.equal(shadowWave.mouse, "m17");
-  assert.equal(shadowWave.scale, 40.35);
-  assert.equal(Math.round(mouse("m17").hp * shadowWave.scale), 242100);
-  assert.equal(Math.round(mouse("m17").atk * shadowWave.scale), 2825);
+  const lateRageWave = snapshot.stage.waves.find((wave) => wave.at === 745);
+  assert.deepEqual(lateRageWave.traits, ["rage"]);
+  assert.equal(lateRageWave.mouse, "m16");
+  assert.equal(lateRageWave.scale, 40.35);
+  assert.equal(Math.round(mouse("m16").hp * lateRageWave.scale), 72630);
+  assert.equal(Math.round(mouse("m16").atk * lateRageWave.scale), 4842);
 });
 
 test("level growth and Tian lightning use full primary and 50% secondary damage", () => {
@@ -128,6 +132,244 @@ test("heatwave halves direct freeze but not Timewarp freeze", () => {
   assert.equal(target.frozen, 1.5);
   engine.control(target, 1.5, false);
   assert.equal(target.frozen, 1.5);
+});
+
+test("full moon restores 1% maximum mouse health per second", () => {
+  const engine = engineFor([{ id: "c1", level: 1 }], {
+    ...bareStage(snapshot.stage),
+    modifier: "moon",
+  });
+  engine.spawnMouse(mouse("m1"), 500, 1);
+  const target = engine.units[0];
+  target.hp = 40;
+  engine.step();
+  assert.ok(Math.abs(target.hp - 40.02) < 1e-9);
+});
+
+test("cat armor and upgraded towers apply the updated numeric rules", () => {
+  const engine = engineFor(
+    [{ id: "a7", level: 1 }],
+    bareStage(snapshot.stage),
+    { items: ["cannon_lv:10", "base_lv:10", "cannon_ready"] },
+  );
+  assert.equal(engine.cannonTime, 25);
+  assert.equal(engine.cannonDamage, 350);
+  assert.equal(engine.cannonCharge, 25);
+  assert.equal(engine.catBaseMax, 7500);
+  engine.money = 1_000_000;
+  engine.deploy(0);
+  const knight = engine.units[0];
+  engine.damage(knight, 100, null, "test");
+  assert.equal(knight.hp, knight.maxHp - 70);
+
+  engine.spawnMouse(mouse("m1"), 500, 1);
+  const cannonPolicy = new AutoPolicy([{ id: "a7", level: 1 }], { autoCannon: true });
+  assert.equal(cannonPolicy.shouldFireCannon(engine), true);
+  assert.equal(engine.fireCannon(), true);
+  assert.ok(engine.units[1].dead > 0);
+});
+
+test("cats use the same dodge check as other combat units", () => {
+  const engine = engineFor([{ id: "c1", level: 1 }], bareStage());
+  engine.money = 1_000_000;
+  engine.deploy(0);
+  const cat = engine.units[0];
+  cat.dodge = 0.5;
+
+  engine.random = () => 0;
+  assert.equal(engine.damage(cat, 100, null, "test"), false);
+  assert.equal(cat.hp, cat.maxHp);
+
+  engine.random = () => 0.99;
+  assert.equal(engine.damage(cat, 100, null, "test"), true);
+  assert.equal(cat.hp, cat.maxHp - 100);
+});
+
+test("Desert Traveler burn deals three delayed 20% attack ticks", () => {
+  const engine = engineFor([{ id: "a9", level: 1 }], bareStage());
+  engine.money = 1_000_000;
+  engine.deploy(0);
+  const traveler = engine.units[0];
+  engine.spawnMouse({ ...mouse("m1"), hp: 1_000_000_000, atk: 0, speed: 0, range: 0 }, 800, 1);
+  const target = engine.units[1];
+  engine.hit(traveler);
+  const afterHit = target.hp;
+  assert.equal(target.burnDamage, 20);
+  traveler.frozen = 10;
+  for (let tick = 0; tick < 49; tick++) engine.step();
+  assert.equal(target.hp, afterHit);
+  engine.step();
+  assert.equal(target.hp, afterHit - 20);
+  for (let tick = 0; tick < 49; tick++) engine.step();
+  engine.step();
+  assert.equal(target.hp, afterHit - 40);
+  for (let tick = 0; tick < 49; tick++) engine.step();
+  engine.step();
+  assert.equal(target.hp, afterHit - 60);
+  for (let tick = 0; tick < 50; tick++) engine.step();
+  assert.equal(target.hp, afterHit - 60);
+});
+
+test("Dune Kitten applies its configured movement slow", () => {
+  const engine = engineFor([{ id: "c10", level: 1 }], bareStage());
+  engine.money = 1_000_000;
+  engine.deploy(0);
+  const kitten = engine.units[0];
+  engine.spawnMouse({ ...mouse("m1"), hp: 1_000_000_000, atk: 0 }, 800, 1);
+  const target = engine.units[1];
+
+  engine.hit(kitten);
+  assert.equal(target.slowed, 2.5);
+  assert.equal(target.slowFactor, 0.75);
+});
+
+test("Gear Artificer maintains one 300 HP turret with half its attack", () => {
+  const engine = engineFor([{ id: "b9", level: 1 }], bareStage(snapshot.stage));
+  engine.money = 1_000_000;
+  engine.deploy(0);
+  const artificer = engine.units[0];
+  artificer.abilityTimer = 0;
+  engine.tickAbility(artificer, 0.02);
+  const turrets = () => engine.units.filter((unit) => unit.kind === "turret");
+  assert.equal(turrets().length, 1);
+  assert.equal(turrets()[0].hp, 300);
+  assert.equal(turrets()[0].atk, 22);
+  assert.equal(turrets()[0].expiresAt, engine.tickCount + 750);
+
+  artificer.abilityTimer = 0;
+  engine.tickAbility(artificer, 0.02);
+  assert.equal(turrets().length, 1);
+});
+
+test("chapter-three intrinsic traits anchor, warm and armorbite work", () => {
+  const engine = engineFor([{ id: "c1", level: 1 }], bareStage(snapshot.stage));
+  engine.spawnMouse(mouse("m29"), 500, 1);
+  const anchor = engine.units[0];
+  assert.equal(anchor.anchor, true);
+  assert.equal(engine.shove(anchor, 90, 18), false);
+  engine.control(anchor, 2, true);
+  assert.equal(anchor.frozen, 2);
+
+  engine.spawnMouse(mouse("m30"), 350, 1);
+  engine.spawnMouse(mouse("m18"), 400, 1);
+  const warmed = engine.units[2];
+  engine.control(warmed, 3, true);
+  assert.equal(warmed.frozen, 1.5);
+  engine.tickWarmAura(4);
+  assert.equal(warmed.frozen, 0);
+
+  engine.money = 1_000_000;
+  engine.deploy(0);
+  const cat = engine.units.find((unit) => unit.side === "cat");
+  engine.spawnMouse(mouse("m32"), cat.x - 55, 1);
+  const armored = engine.units.at(-1);
+  engine.hit(armored);
+  assert.equal(cat.hp, cat.maxHp - 61);
+});
+
+test("Pharaoh summons mummies and restores 30% once below half health", () => {
+  const engine = engineFor([{ id: "c1", level: 1 }], bareStage(snapshot.stage));
+  engine.spawnMouse(mouse("m41"), 500, 1);
+  const pharaoh = engine.units[0];
+  pharaoh.abilityTimer = 0;
+  engine.tickAbility(pharaoh, 0.02);
+  assert.equal(engine.units.filter((unit) => unit.id === "m41s").length, 2);
+
+  engine.damage(pharaoh, 15_000, null, "test");
+  assert.equal(pharaoh.hp, 21_400);
+  assert.equal(pharaoh.revive, 0);
+  engine.damage(pharaoh, 5_000, null, "test");
+  assert.equal(pharaoh.hp, 16_400);
+});
+
+test("chapter-four motion, weather and twist units follow the live rules", () => {
+  const engine = engineFor([{ id: "c1", level: 1 }], bareStage(snapshot.stage));
+  engine.spawnMouse(mouse("m39"), 500, 1, ["charge"]);
+  const camel = engine.units[0];
+  for (let tick = 0; tick < 50; tick++) engine.step();
+  assert.ok(Math.abs(camel.x - 580) < 1e-9);
+  assert.equal(engine.push(camel, 10, 10), true);
+  assert.equal(camel.chargeTicks, 0);
+  assert.equal(camel.chargeFirstHit, false);
+
+  engine.money = 1_000_000;
+  engine.deploy(0);
+  const cat = engine.units.find((unit) => unit.side === "cat");
+  cat.x = 700;
+  engine.spawnMouse(mouse("m38"), 660, 1, ["leap"]);
+  const burrower = engine.units.at(-1);
+  burrower.cooldown = 0;
+  engine.step();
+  assert.equal(burrower.x, 850);
+  assert.equal(burrower.leap, false);
+
+  const mirage = engineFor([{ id: "c1", level: 1 }], {
+    ...bareStage(snapshot.stage),
+    twist: "mirage",
+  });
+  mirage.spawnMouse(mouse("m1"), 200, 1);
+  mirage.spawnMouse(mouse("m1"), 210, 1);
+  assert.equal(mirage.units[0].hp, 100);
+  assert.equal(mirage.units[1].hp, 1);
+  assert.equal(mirage.units[1].phantom, true);
+
+  const weather = engineFor([{ id: "c1", level: 1 }], {
+    ...bareStage(snapshot.stage),
+    events: [{ kind: "sandstorm", at: 60, every: 60, last: 8, value: 200 }],
+  });
+  weather.time = 60;
+  assert.equal(weather.attackRange({ range: 240 }, 240), 200);
+  weather.time = 68;
+  assert.equal(weather.attackRange({ range: 240 }, 240), 240);
+});
+
+test("caravan and treasure camel use neutral/timed twist mechanics", () => {
+  const caravan = engineFor([{ id: "c1", level: 1 }], {
+    ...bareStage(snapshot.stage),
+    base_hp: 10_000,
+    twist: "caravan",
+  });
+  caravan.spawnTwistUnit("caravan");
+  const caravanUnit = caravan.units[0];
+  caravanUnit.x = 80.01;
+  caravan.step();
+  assert.equal(caravanUnit.dead, -1);
+  assert.equal(caravan.mouseBaseHp, 7000);
+
+  const treasure = engineFor([{ id: "c1", level: 1 }], {
+    ...bareStage(snapshot.stage),
+    twist: "treasure_camel",
+  });
+  treasure.spawnTwistUnit("treasure");
+  const camel = treasure.units[0];
+  treasure.damage(camel, 1000, null, "test");
+  assert.equal(camel.hp, 0);
+  assert.equal(treasure.money, 450);
+});
+
+test("endless scenarios can model the borrowed extra team slot", () => {
+  const team = snapshot.catalog.cats.slice(0, 11).map((cat) => ({ id: cat.id, level: 1 }));
+  const endless = simulate({
+    snapshot,
+    team,
+    teamSlots: 11,
+    stageId: 9101,
+    maxTime: 0.02,
+    policy: { automatic: false },
+  });
+  assert.equal(endless.teamSlots, 11);
+
+  assert.throws(
+    () => simulate({
+      snapshot,
+      team,
+      teamSlots: 11,
+      stageId: 1,
+      maxTime: 0.02,
+      policy: { automatic: false },
+    }),
+    /only supported for endless stage 9101/,
+  );
 });
 
 test("battle items apply their documented battle-only modifiers", () => {
@@ -366,7 +608,7 @@ test("the bundled endless example reproduces the expected late-round survival ba
     maxTime: scenario.maxTime,
     seed: 1,
   });
-  assert.ok(result.duration >= 820 && result.duration <= 880, `unexpected duration ${result.duration}`);
-  assert.ok(result.round >= 28, `unexpected round ${result.round}`);
+  assert.ok(result.duration >= 740 && result.duration <= 800, `unexpected duration ${result.duration}`);
+  assert.ok(result.round >= 25, `unexpected round ${result.round}`);
   assert.equal(result.towerHp, 0);
 });
