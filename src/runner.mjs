@@ -263,6 +263,7 @@ export function simulate({
   }
 
   const duration = Math.min(engine.time, hardStop);
+  const enemyBaseHp = Math.max(0, Math.round(engine.mouseBaseHp));
   return {
     seed: Number(seed),
     stage: {
@@ -277,7 +278,9 @@ export function simulate({
     round: Math.min(30, Math.floor(duration / 30) + 1),
     towerHp: Math.max(0, Math.round(engine.catBaseHp)),
     towerMaxHp: engine.catBaseMax,
-    enemyBaseHp: Math.max(0, Math.round(engine.mouseBaseHp)),
+    enemyBaseHp,
+    enemyBaseMaxHp: engine.mouseBaseMax,
+    fortressDamage: Math.max(0, engine.mouseBaseMax - enemyBaseHp),
     bossDamage: Math.round(engine.bossDamage),
     money: Math.floor(engine.money),
     walletLevel: engine.walletLevel,
@@ -306,6 +309,18 @@ function percentile(sorted, p) {
   return sorted[lower] + (sorted[upper] - sorted[lower]) * (position - lower);
 }
 
+function damageDistribution(values) {
+  const sorted = values.toSorted((a, b) => a - b);
+  return {
+    mean: sorted.reduce((sum, value) => sum + value, 0) / sorted.length,
+    min: sorted[0],
+    p10: percentile(sorted, 0.1),
+    median: percentile(sorted, 0.5),
+    p90: percentile(sorted, 0.9),
+    max: sorted[sorted.length - 1],
+  };
+}
+
 export function aggregate(runs) {
   if (!runs.length) throw new Error("no simulation runs to aggregate");
   const durations = runs.map((run) => run.duration).sort((a, b) => a - b);
@@ -318,6 +333,14 @@ export function aggregate(runs) {
   }
   const bossDamages = runs.map((run) => run.bossDamage ?? 0).sort((a, b) => a - b);
   const bossMean = bossDamages.reduce((sum, value) => sum + value, 0) / bossDamages.length;
+  const knownFortressDamage = runs.filter((run) => run.fortressDamage !== undefined);
+  if (knownFortressDamage.length && knownFortressDamage.length !== runs.length) {
+    throw new Error("cannot aggregate mixed known and unknown fortress damage");
+  }
+  if (knownFortressDamage.some((run) => !Number.isFinite(run.fortressDamage) || run.fortressDamage < 0)) {
+    throw new Error("fortressDamage must be a finite non-negative number");
+  }
+  const fullDurationRuns = runs.filter((run) => run.result === "timeup");
   return {
     runs: runs.length,
     mean,
@@ -334,6 +357,13 @@ export function aggregate(runs) {
       p90: percentile(bossDamages, 0.9),
       max: bossDamages[bossDamages.length - 1],
     },
+    ...(knownFortressDamage.length ? {
+      fortressDamage: damageDistribution(runs.map((run) => run.fortressDamage)),
+      fullDurationFortressDamage: fullDurationRuns.length ? {
+        runs: fullDurationRuns.length,
+        ...damageDistribution(fullDurationRuns.map((run) => run.fortressDamage)),
+      } : null,
+    } : {}),
     results,
     rounds,
   };

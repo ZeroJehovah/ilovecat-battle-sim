@@ -119,7 +119,8 @@ A single run reports:
 - `result`: `lost`, `timeup`, `won`, or `limit` when `maxTime` is reached first.
 - `duration`: simulated battle seconds.
 - `round`: `min(30, floor(duration / 30) + 1)` for the endless display convention.
-- `teamSlots`, `towerHp`, `towerMaxHp`, `enemyBaseHp`, `money`, `walletLevel`, `field`, and `fieldCount`.
+- `teamSlots`, `towerHp`, `towerMaxHp`, `enemyBaseHp`, `enemyBaseMaxHp`, `money`, `walletLevel`, `field`, and `fieldCount`.
+- `fortressDamage`: net enemy fortress HP loss, `max(0, enemyBaseMaxHp - enemyBaseHp)`, using the reported rounded remaining HP. Shields and undefeated guards can block effective loss; attempted hit amounts and overkill are not counted as additional fortress damage.
 - `bossDamage`: direct damage dealt to the stage's declared boss. On a timed boss stage that cannot be defeated in one attempt, this is the primary score metric.
 - `stats`: deployments, mouse kills, cat losses, and rage triggers.
 - `telemetry`: damage, kills, healing, deployment counts, deaths, maximum simultaneous copies, and first deployment/death times by cat id.
@@ -127,7 +128,11 @@ A single run reports:
 - `events`: only with `--events`; useful for precise hit/heal/freeze/rage timing.
 - `actionLog`: only with `--trace`; every deploy, wallet, and cannon action with its battle-clock time.
 
-Batch output adds duration and boss-damage mean, minimum, P10, median, P90, maximum, plus result counts and round counts. Compare uses one shared seed range for every candidate.
+Batch output adds duration, fortress-damage and boss-damage mean, minimum, P10, median, P90, maximum, plus result counts and round counts. `fullDurationFortressDamage` contains the same damage statistics and `runs` for the subset with `result: "timeup"`; it is `null` when no run reaches the time limit. Table and Markdown output show the full-duration fraction explicitly. A shorter `maxTime` result (`limit`) is not a full-duration success. Compare uses one shared seed range for every candidate.
+
+Endless comparisons report both survival (full-duration fraction and duration distribution) and fortress damage, with survival taking priority. Report the all-run mean first; the full-duration-only mean is conditional and must not replace it. Boss-unit damage is a separate metric and is not enemy fortress damage. No combined scoring formula is assumed.
+
+When aggregating legacy samples without `fortressDamage`, the two fortress-statistic fields are omitted rather than filled with zero. Mixing known and unknown fortress damage is rejected. Legacy fortress loss can be reconstructed only when the original stage's starting HP is known.
 
 ## Validation limits
 

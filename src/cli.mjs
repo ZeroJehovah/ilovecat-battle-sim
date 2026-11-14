@@ -76,11 +76,17 @@ function formatDuration(seconds) {
 }
 
 function tableForAggregate(name, aggregateResult) {
+  const full = aggregateResult.results.timeup ?? 0;
   return [
     `Scenario: ${name}`,
     `Runs: ${aggregateResult.runs}`,
+    `Full duration: ${full}/${aggregateResult.runs} (${(100 * full / aggregateResult.runs).toFixed(2)}%)`,
     `Mean: ${aggregateResult.mean.toFixed(2)}s (${formatDuration(aggregateResult.mean)})`,
     `Min/P10/Median/P90/Max: ${aggregateResult.min.toFixed(2)} / ${aggregateResult.p10.toFixed(2)} / ${aggregateResult.median.toFixed(2)} / ${aggregateResult.p90.toFixed(2)} / ${aggregateResult.max.toFixed(2)}s`,
+    aggregateResult.fortressDamage
+      ? `Fortress damage Mean/Min/P10/Median/P90/Max: ${aggregateResult.fortressDamage.mean.toFixed(2)} / ${aggregateResult.fortressDamage.min} / ${aggregateResult.fortressDamage.p10.toFixed(2)} / ${aggregateResult.fortressDamage.median.toFixed(2)} / ${aggregateResult.fortressDamage.p90.toFixed(2)} / ${aggregateResult.fortressDamage.max}`
+      : "Fortress damage: unavailable",
+    `Fortress damage mean for full-duration runs: ${aggregateResult.fullDurationFortressDamage?.mean.toFixed(2) ?? "unavailable"}`,
     `Boss damage Mean/Min/P10/Median/P90/Max: ${aggregateResult.bossDamage.mean.toFixed(2)} / ${aggregateResult.bossDamage.min} / ${aggregateResult.bossDamage.p10.toFixed(2)} / ${aggregateResult.bossDamage.median.toFixed(2)} / ${aggregateResult.bossDamage.p90.toFixed(2)} / ${aggregateResult.bossDamage.max}`,
     `Results: ${Object.entries(aggregateResult.results).map(([key, value]) => `${key}=${value}`).join(", ")}`,
     `Rounds: ${Object.entries(aggregateResult.rounds).map(([key, value]) => `R${key}=${value}`).join(", ")}`,
@@ -88,12 +94,24 @@ function tableForAggregate(name, aggregateResult) {
 }
 
 function markdownForAggregate(name, result) {
+  const full = result.results.timeup ?? 0;
+  const damageRow = (label, stats) => stats
+    ? `| ${label} | ${stats.mean.toFixed(2)} | ${stats.min} | ${stats.p10.toFixed(2)} | ${stats.median.toFixed(2)} | ${stats.p90.toFixed(2)} | ${stats.max} |`
+    : `| ${label} | unavailable | — | — | — | — | — |`;
   return [
     `### ${name}`,
     "",
-    "| Runs | Mean | Min | P10 | Median | P90 | Max | Boss Mean | Boss Min | Boss P10 | Boss Median | Boss P90 | Boss Max | Results | Rounds |",
-    "|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---|",
-    `| ${result.runs} | ${result.mean.toFixed(2)}s | ${result.min.toFixed(2)}s | ${result.p10.toFixed(2)}s | ${result.median.toFixed(2)}s | ${result.p90.toFixed(2)}s | ${result.max.toFixed(2)}s | ${result.bossDamage.mean.toFixed(2)} | ${result.bossDamage.min} | ${result.bossDamage.p10.toFixed(2)} | ${result.bossDamage.median.toFixed(2)} | ${result.bossDamage.p90.toFixed(2)} | ${result.bossDamage.max} | ${Object.entries(result.results).map(([key, value]) => `${key}=${value}`).join(", ")} | ${Object.entries(result.rounds).map(([key, value]) => `R${key}=${value}`).join(", ")} |`,
+    "| Runs | Full duration | Mean | Min | P10 | Median | P90 | Max |",
+    "|---:|---:|---:|---:|---:|---:|---:|---:|",
+    `| ${result.runs} | ${full}/${result.runs} (${(100 * full / result.runs).toFixed(2)}%) | ${result.mean.toFixed(2)}s | ${result.min.toFixed(2)}s | ${result.p10.toFixed(2)}s | ${result.median.toFixed(2)}s | ${result.p90.toFixed(2)}s | ${result.max.toFixed(2)}s |`,
+    "",
+    "| Damage | Mean | Min | P10 | Median | P90 | Max |",
+    "|---|---:|---:|---:|---:|---:|---:|---:|",
+    damageRow("Fortress", result.fortressDamage),
+    damageRow("Fortress (full duration only)", result.fullDurationFortressDamage),
+    damageRow("Boss", result.bossDamage),
+    "",
+    `Results: ${Object.entries(result.results).map(([key, value]) => `${key}=${value}`).join(", ")}. Rounds: ${Object.entries(result.rounds).map(([key, value]) => `R${key}=${value}`).join(", ")}.`,
   ].join("\n");
 }
 
@@ -162,30 +180,14 @@ async function commandRun(snapshot, scenario, options) {
     return [
       `### ${payload.name}`,
       "",
-      "| Seed | Result | Time | Round | Tower HP | Boss Damage | Field | Deployed | Kills | Wallet |",
-      "|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|",
-      `| ${payload.seed} | ${payload.result} | ${payload.duration.toFixed(2)}s | ${payload.round} | ${payload.towerHp}/${payload.towerMaxHp} | ${payload.bossDamage} | ${payload.fieldCount} | ${payload.stats.deployed} | ${payload.stats.beaten} | ${payload.walletLevel} |`,
+      "| Seed | Result | Time | Round | Tower HP | Fortress Damage | Boss Damage | Field | Deployed | Kills | Wallet |",
+      "|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
+      `| ${payload.seed} | ${payload.result} | ${payload.duration.toFixed(2)}s | ${payload.round} | ${payload.towerHp}/${payload.towerMaxHp} | ${payload.fortressDamage} | ${payload.bossDamage} | ${payload.fieldCount} | ${payload.stats.deployed} | ${payload.stats.beaten} | ${payload.walletLevel} |`,
+      "",
+      `Full duration: ${payload.result === "timeup" ? "1/1 (100.00%)" : "0/1 (0.00%)"}.`,
     ].join("\n");
   }
-  return tableForAggregate(payload.name, {
-    runs: 1,
-    mean: payload.duration,
-    min: payload.duration,
-    p10: payload.duration,
-    median: payload.duration,
-    p90: payload.duration,
-    max: payload.duration,
-    bossDamage: {
-      mean: payload.bossDamage,
-      min: payload.bossDamage,
-      p10: payload.bossDamage,
-      median: payload.bossDamage,
-      p90: payload.bossDamage,
-      max: payload.bossDamage,
-    },
-    results: { [payload.result]: 1 },
-    rounds: { [payload.round]: 1 },
-  });
+  return tableForAggregate(payload.name, aggregate([payload]));
 }
 
 async function commandBatch(snapshot, scenario, options) {
