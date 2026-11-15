@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         喵喵的逆袭 · 数据导出与策略执行
 // @namespace    https://github.com/ZeroJehovah/ilovecat-battle-sim
-// @version      0.5.6-SNAPSHOT
+// @version      0.6.0-SNAPSHOT
 // @description  按范围只读导出战斗数据与 JS，并从在线索引或本地文件选择策略操作战斗页面
 // @match        https://api.ilovecat520.me/*
 // @updateURL    https://raw.githubusercontent.com/ZeroJehovah/ilovecat-battle-sim/main/tools/ilovecat-workbench.user.js
@@ -18,7 +18,7 @@
 
   const STRATEGY_FORMAT = "ilovecat-battle-strategy";
   const EXPORT_FORMAT = "ilovecat-game-export";
-  const USERSCRIPT_VERSION = "0.5.6-SNAPSHOT";
+  const USERSCRIPT_VERSION = "0.6.0-SNAPSHOT";
   const STRATEGY_INDEX_URL = "https://github.com/ZeroJehovah/ilovecat-battle-sim-docs/raw/main/strategies/index.json";
   const STRATEGY_INDEX_TTL_MS = 5 * 60 * 1000;
   const ACTION_GAP_MS = 250;
@@ -30,6 +30,7 @@
   const AUTO_SPEED_MAX_EXTRA_EXIT_SECONDS = 6;
   const AUTO_SPEED_ENTER_LEAD_SECONDS = 4;
   const AUTO_SPEED_STUCK_MS = 1800;
+  const AUTO_EXECUTE_TIMEOUT_MS = 10 * 60 * 1000;
   const ITEM_NAMES = {
     start_coins: "開場金幣",
     fast_coins: "加速補給",
@@ -69,6 +70,8 @@
   let onlineStrategyIndex = null;
   let onlineStrategyIndexPromise = null;
   let onlineStrategyIndexLoadedAt = 0;
+  let hiddenWorkbench = null;
+  let autoExecution = null;
 
   pageWindow.__ilovecatWorkbenchV1?.destroy?.();
 
@@ -76,7 +79,9 @@
   wireUi();
   pageWindow.__ilovecatWorkbenchV1 = {
     destroy() {
+      cancelAutoExecution("", false);
       stopExecutor("", false);
+      restoreWorkbench();
       speedRestoreToken++;
       ui.host.remove();
       delete pageWindow.__ilovecatWorkbenchV1;
@@ -92,7 +97,7 @@
       <style>
         :host { all: initial; }
         * { box-sizing: border-box; }
-        button, textarea, input { font: inherit; }
+        button, textarea, input, select { font: inherit; }
         .launcher {
           position: fixed; right: 14px; top: 76px; z-index: 2147483647;
           width: 46px; height: 46px; border-radius: 15px; border: 1px solid #5b4a32;
@@ -108,7 +113,7 @@
           background: #171c24; color: #f7ead0; padding: 14px;
           box-shadow: 0 18px 60px rgba(0,0,0,.5); font-family: system-ui, sans-serif;
         }
-        .panel[hidden], .view[hidden] { display: none !important; }
+        .panel[hidden], .view[hidden], .launcher[hidden] { display: none !important; }
         .head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
         .title { font-size: 16px; font-weight: 750; }
         .version { margin-left: 3px; color: #b9ad98; font-size: 12px; font-weight: 600; }
@@ -263,6 +268,11 @@
         }
         .execute-options { display: flex; align-items: center; gap: 18px; margin: 10px 0; white-space: nowrap; }
         .execute-options label.check { margin: 0; }
+        .speed-option { display: flex; align-items: center; gap: 7px; font-size: 13px; }
+        .speed-option select {
+          border: 1px solid #5e513d; border-radius: 8px; background: #282f3a;
+          color: #f7ead0; padding: 5px 7px; cursor: pointer;
+        }
         .item-warning {
           margin: 8px 0 0; padding: 8px 10px; border-radius: 8px;
           border: 1px solid #8a4b2a; background: #2a1b14; color: #ffc38a;
@@ -374,11 +384,20 @@
         <div class="execution-panel" hidden>
           <div class="execute-options">
             <label class="check warning"><input class="auto-start" type="checkbox" checked> 自动开始战斗</label>
-            <label class="check"><input class="auto-speed" type="checkbox" checked> 自动倍速</label>
+            <label class="check"><input class="silent-run" type="checkbox"> 静默执行</label>
+            <label class="speed-option">执行倍速
+              <select class="run-speed" aria-label="执行倍速">
+                <option value="1">1x</option>
+                <option value="2">2x</option>
+                <option value="3">3x</option>
+                <option value="auto" selected>自动</option>
+              </select>
+            </label>
           </div>
           <p class="item-warning" hidden></p>
           <div class="actions">
             <button class="primary run" type="button">开始执行</button>
+            <button class="auto-run" type="button">自动执行</button>
             <button class="danger stop" type="button">停止</button>
           </div>
           <div class="strategy-summary" aria-label="策略信息">
@@ -414,10 +433,12 @@
       localFileStatus: root.querySelector(".local-file-status"),
       executionPanel: root.querySelector(".execution-panel"),
       autoStart: root.querySelector(".auto-start"),
-      autoSpeed: root.querySelector(".auto-speed"),
+      silentRun: root.querySelector(".silent-run"),
+      runSpeed: root.querySelector(".run-speed"),
       itemWarning: root.querySelector(".item-warning"),
       loadStrategy: root.querySelector(".load-strategy"),
       run: root.querySelector(".run"),
+      autoRun: root.querySelector(".auto-run"),
       stop: root.querySelector(".stop"),
       summaryName: root.querySelector(".strategy-summary-name"),
       summaryStage: root.querySelector(".strategy-summary-stage"),
@@ -548,16 +569,35 @@
       });
     });
     ui.run.addEventListener("click", () => runBusy(() => startFromUi()));
+    ui.autoRun.addEventListener("click", () => runBusy(() => armAutoExecute()));
     ui.stop.addEventListener("click", () => stopExecutor("用户停止。"));
-    ui.autoSpeed.addEventListener("change", () => {
+    ui.runSpeed.addEventListener("change", () => {
       if (!executor) return;
       executor.autoSpeedTarget = 1;
       executor.autoSpeedStuckSince = 0;
       executor.autoSpeedMissingSince = 0;
+      const mode = parseSpeedChoice(ui.runSpeed.value);
+      if (mode !== "auto" && mode !== 1) executor.autoSpeedRaised = true;
     });
     syncExportControlState();
     updateExportControls();
     syncStrategyControls();
+  }
+
+  function hideWorkbench(kind) {
+    if (!hiddenWorkbench) {
+      hiddenWorkbench = { kind, panelWasOpen: !ui.panel.hidden };
+    }
+    ui.launcher.hidden = true;
+    ui.panel.hidden = true;
+  }
+
+  function restoreWorkbench() {
+    if (!hiddenWorkbench) return;
+    const { panelWasOpen } = hiddenWorkbench;
+    hiddenWorkbench = null;
+    ui.launcher.hidden = false;
+    ui.panel.hidden = !panelWasOpen;
   }
 
   function showTab(name) {
@@ -591,13 +631,14 @@
   }
 
   function syncStrategyControls() {
-    const locked = busy || Boolean(executor);
+    const locked = busy || Boolean(executor) || Boolean(autoExecution);
     ui.loadStrategy.disabled = locked;
     ui.strategyFile.disabled = locked;
     for (const button of ui.onlineStageFilters.querySelectorAll("button")) button.disabled = locked;
     for (const button of ui.onlineStrategies.querySelectorAll("button")) button.disabled = locked;
     for (const button of ui.runStatus.querySelectorAll(".retry-validation")) button.disabled = locked;
     ui.run.disabled = locked || !activeStrategyText;
+    ui.autoRun.disabled = locked || !activeStrategyText;
     ui.stop.disabled = !executor;
   }
 
@@ -2230,6 +2271,8 @@
       return;
     }
 
+    const speedChoice = parseSpeedChoice(ui.runSpeed.value);
+    if (ui.silentRun.checked) hideWorkbench("run");
     stopExecutor("", false);
     speedRestoreToken++;
     executor = {
@@ -2249,16 +2292,17 @@
       moneyHistory: [],
       autoSpeedTarget: 1,
       autoSpeedEta: null,
-      autoSpeedRaised: false,
+      autoSpeedRaised: speedChoice !== "auto" && speedChoice !== 1,
       autoSpeedStuckSince: 0,
       autoSpeedMissingSince: 0,
+      silent: Boolean(hiddenWorkbench),
       timer: null,
       stopped: false,
     };
     ui.run.disabled = true;
     executor.timer = setTimeout(executeTick, 0);
     setRunStatus("校验通过，正在点击“开始战斗”…");
-    if (ui.autoSpeed.checked) setStoredBattleSpeed(1);
+    setStoredBattleSpeed(speedChoice === "auto" ? 1 : speedChoice);
     prep.startButton.click();
   }
 
@@ -2270,8 +2314,10 @@
   }
 
   function startExecutor(strategy, runtime) {
+    if (ui.silentRun.checked) hideWorkbench("run");
     stopExecutor("", false);
     speedRestoreToken++;
+    const speedChoice = parseSpeedChoice(ui.runSpeed.value);
     executor = {
       strategy,
       policy: strategy.policy,
@@ -2288,19 +2334,22 @@
       moneyHistory: [],
       autoSpeedTarget: 1,
       autoSpeedEta: null,
-      autoSpeedRaised: false,
+      autoSpeedRaised: speedChoice !== "auto" && speedChoice !== 1,
       autoSpeedStuckSince: 0,
       autoSpeedMissingSince: 0,
+      silent: Boolean(hiddenWorkbench),
       timer: null,
       stopped: false,
     };
     ui.run.disabled = true;
     executor.timer = setTimeout(executeTick, 0);
     setRunStatus("运行中：等待战斗快照…");
+    syncStrategyControls();
   }
 
   function stopExecutor(message, updateStatus = true) {
     const raised = Boolean(executor?.autoSpeedRaised);
+    const silent = Boolean(executor?.silent);
     const token = ++speedRestoreToken;
     if (executor?.timer) clearTimeout(executor.timer);
     if (executor) executor.stopped = true;
@@ -2312,6 +2361,7 @@
       restoreSpeedTo1(token);
     }
     if (message && updateStatus) setRunStatus(message);
+    if (silent) restoreWorkbench();
   }
 
   async function restoreSpeedTo1(token) {
@@ -2323,6 +2373,117 @@
       button.click();
       await new Promise((resolve) => setTimeout(resolve, ACTION_GAP_MS));
     }
+  }
+
+  function parseSelectedStrategy() {
+    if (!activeStrategyText) throw new Error("请先选择在线策略或本地 JSON 文件。");
+    const strategy = parseStrategy(activeStrategyText);
+    if (selectedOnlineStrategyId) {
+      const entry = onlineStrategyIndex?.strategies.find((item) => item.id === selectedOnlineStrategyId);
+      if (!entry) throw new Error("在线策略已从有效索引移除，请刷新策略列表后重新选择。");
+      validateIndexedStrategy(onlineStrategyIndex, entry, strategy);
+    }
+    return strategy;
+  }
+
+  function armAutoExecute() {
+    if (executor) {
+      setRunStatus("执行器已在运行，请先停止。", true);
+      return;
+    }
+    let strategy;
+    try {
+      strategy = parseSelectedStrategy();
+    } catch (error) {
+      setRunStatus(error instanceof Error ? error.message : String(error), true);
+      return;
+    }
+    cancelAutoExecution("", false);
+    autoExecution = {
+      strategy,
+      baseline: captureAutoExecutionBaseline(),
+      armedAt: performance.now(),
+      timer: null,
+    };
+    hideWorkbench("auto");
+    setRunStatus("自动执行待命：进入符合策略的新战斗后将自动开始。");
+    syncStrategyControls();
+    autoExecution.timer = setTimeout(pollAutoExecution, LOOP_MS);
+  }
+
+  function captureAutoExecutionBaseline() {
+    const screens = new Map();
+    const seeds = new Set();
+    for (const screen of pageDocument.querySelectorAll(".cat-battle-screen")) {
+      const runtime = readBattleRuntime(screen);
+      if (!runtime.context || runtime.snapshot?.result !== "playing") continue;
+      if (runtime.context.seed != null) seeds.add(runtime.context.seed);
+      screens.set(screen, {
+        time: Number(runtime.snapshot.time ?? 0),
+        seed: runtime.context.seed ?? null,
+      });
+    }
+    return { screens, seeds };
+  }
+
+  // testable:isNewBattleForAutoExecution
+  function isNewBattleForAutoExecution(baseline, runtime) {
+    if (!baseline) return true;
+    const seed = runtime?.context?.seed;
+    if (seed != null && baseline.seed != null && Number(seed) !== Number(baseline.seed)) return true;
+    return Number(runtime?.snapshot?.time ?? 0) < Number(baseline.time) - 1;
+  }
+  // end testable:isNewBattleForAutoExecution
+
+  function findNewAutoExecutionBattle(auto) {
+    for (const screen of pageDocument.querySelectorAll(".cat-battle-screen")) {
+      const runtime = readBattleRuntime(screen);
+      if (!runtime.context || runtime.snapshot?.result !== "playing") continue;
+      if (runtime.context.seed != null && auto.baseline.seeds.has(runtime.context.seed)) continue;
+      if (!isNewBattleForAutoExecution(auto.baseline.screens.get(screen), runtime)) continue;
+      return runtime;
+    }
+    return null;
+  }
+
+  function pollAutoExecution() {
+    if (!autoExecution) return;
+    const current = autoExecution;
+    try {
+      if (performance.now() - current.armedAt > AUTO_EXECUTE_TIMEOUT_MS) {
+        cancelAutoExecution("自动执行等待超时，已恢复脚本面板。", true);
+        return;
+      }
+      const runtime = findNewAutoExecutionBattle(current);
+      if (!runtime) {
+        current.timer = setTimeout(pollAutoExecution, LOOP_MS);
+        return;
+      }
+      const messages = validateStrategy(current.strategy, runtime);
+      const errors = messages.filter((line) => line.startsWith("错误"));
+      if (errors.length) {
+        cancelAutoExecution(`自动执行已取消：\n${errors.join("\n")}`, true);
+        return;
+      }
+      clearTimeout(current.timer);
+      autoExecution = null;
+      startExecutor(current.strategy, runtime);
+    } catch (error) {
+      cancelAutoExecution(`自动执行失败：${error instanceof Error ? error.message : String(error)}`, true);
+      restoreWorkbench();
+      syncStrategyControls();
+    }
+  }
+
+  function cancelAutoExecution(message, updateStatus) {
+    if (autoExecution?.timer) clearTimeout(autoExecution.timer);
+    const wasArmed = Boolean(autoExecution);
+    autoExecution = null;
+    if (wasArmed) {
+      restoreWorkbench();
+      syncStrategyControls();
+    }
+    if (message && updateStatus) setRunStatus(message, true);
   }
 
   function scheduleExecutorTick() {
@@ -2383,16 +2544,15 @@
         executor.staleSince = performance.now();
       }
       if (performance.now() - executor.staleSince > 1500) return;
-      const autoSpeedOn = ui.autoSpeed.checked;
-      const speedState = autoSpeedOn
-        ? manageAutoSpeed(snapshot, runtime.context)
-        : (executor.autoSpeedRaised ? restoreAutoSpeedTick() : null);
+      const speedMode = parseSpeedChoice(ui.runSpeed.value);
+      const speedState = manageExecutionSpeed(snapshot, runtime.context, speedMode);
       if (speedState?.busy) {
         executor.nextActionAt = performance.now() + ACTION_GAP_MS;
         updateRunningStatus(snapshot, speedState);
         return;
       }
-      if (autoSpeedOn && speedState.current !== 1) {
+      const requiredSpeed = speedMode === "auto" ? 1 : speedMode;
+      if (speedState.current !== requiredSpeed) {
         updateRunningStatus(snapshot, speedState);
         return;
       }
@@ -2789,18 +2949,48 @@
     return { current, target, eta, exitSeconds, busy: true };
   }
 
-  function restoreAutoSpeedTick() {
+  // testable:parseSpeedChoice
+  function parseSpeedChoice(value) {
+    if (String(value) === "auto") return "auto";
+    const target = Number(value);
+    return target === 1 || target === 2 || target === 3 ? target : "auto";
+  }
+  // end testable:parseSpeedChoice
+
+  function manageExecutionSpeed(snapshot, context, mode) {
+    if (mode === "auto") return manageAutoSpeed(snapshot, context);
+    return manageFixedSpeed(mode);
+  }
+
+  // testable:manageFixedSpeed
+  function manageFixedSpeed(target) {
     const current = readBattleSpeedNumber();
-    if (current === 1 || current == null) {
-      if (current === 1) executor.autoSpeedRaised = false;
-      return { current, target: 1, eta: null, busy: false };
+    if (current == null) {
+      const missingSince = executor.autoSpeedMissingSince ||= performance.now();
+      if (performance.now() - missingSince > AUTO_SPEED_STUCK_MS) {
+        throw new Error(`执行倍速找不到战斗倍速按钮（目标 ${target}×）；为避免在未知倍速下执行动作，执行器已停止。`);
+      }
+      return { current: null, target, eta: null, reason: "固定倍速", busy: false };
+    }
+    executor.autoSpeedMissingSince = 0;
+    if (current === target) {
+      executor.autoSpeedStuckSince = 0;
+      return { current, target, eta: null, reason: "固定倍速", busy: false };
     }
     if (performance.now() < executor.nextActionAt) {
-      return { current, target: 1, eta: null, busy: false, waiting: true };
+      return { current, target, eta: null, reason: "固定倍速", busy: false, waiting: true };
     }
-    if (cycleBattleSpeed()) return { current, target: 1, eta: null, busy: true };
-    return { current, target: 1, eta: null, busy: false, disabled: true };
+    const stuckSince = executor.autoSpeedStuckSince ||= performance.now();
+    if (performance.now() - stuckSince > AUTO_SPEED_STUCK_MS) {
+      throw new Error(`执行倍速无法从 ${current}× 切到 ${target}×；请手动调整倍速后重试。`);
+    }
+    if (!cycleBattleSpeed()) {
+      return { current, target, eta: null, reason: "固定倍速", busy: false, disabled: true };
+    }
+    executor.autoSpeedRaised = true;
+    return { current, target, eta: null, reason: "固定倍速", busy: true };
   }
+  // end testable:manageFixedSpeed
 
   function updateRunningStatus(snapshot, speedState = null) {
     const policy = executor.policy;
@@ -2811,8 +3001,9 @@
       ? `  序列 ${executor.sequenceIndex}/${policy.deploySequence.length}`
       : "";
     const speed = speedState?.current ?? readBattleSpeedNumber();
-    const autoSpeed = ui.autoSpeed.checked;
-    const speedText = speed == null ? "" : `  速度 ${speed}×${autoSpeed ? "（自动）" : ""}`;
+    const speedMode = parseSpeedChoice(ui.runSpeed.value);
+    const autoSpeed = speedMode === "auto";
+    const speedText = speed == null ? "" : `  速度 ${speed}×${autoSpeed ? "（自动）" : `（目标 ${speedMode}×）`}`;
     let speedNote = "";
     if (autoSpeed) {
       const eta = executor.autoSpeedEta;
@@ -2823,8 +3014,12 @@
           : "，没有已知的后续操作";
       speedNote = `\n自动倍速：${executor.autoSpeedTarget === 3 ? "空闲 3×" : "动作前 1×"}${etaText}。`;
       if (speed != null && speed !== 1) speedNote += " 当前不会执行策略动作。";
-    } else if (speed != null && speed !== 1) {
-      speedNote = `\n提示：当前为 ${speed}× 倍速；动作节流按真实时间，精确复刻建议 1×。`;
+    } else if (speed == null) {
+      speedNote = `\n执行倍速：等待读取战斗倍速（目标 ${speedMode}×），确认前不会执行策略动作。`;
+    } else if (speed !== speedMode) {
+      speedNote = `\n执行倍速：目标 ${speedMode}×，当前 ${speed}×；切换完成后继续执行。`;
+    } else if (speedMode !== 1) {
+      speedNote = `\n执行倍速：固定 ${speedMode}×；动作节流按真实时间，游戏内时间轴会加速。`;
     }
     const cannonStatus = policy.autoCannon
       ? `炮击 ${shouldFireCannon(snapshot, policy) ? "目标就绪" : "待命"}`
@@ -2863,6 +3058,7 @@
           context = {
             stageId: Number(props.stage?.id),
             stageName: String(props.stage?.name ?? ""),
+            seed: Number.isFinite(Number(props.seed)) ? Number(props.seed) : null,
             team: props.team.map((entry, slot) => {
               const cat = entry?.cat ?? {};
               return {

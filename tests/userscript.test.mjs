@@ -29,7 +29,7 @@ test("the userscript is syntactically valid and exposes both workflows", () => {
   assert.match(source, /@grant\s+GM_xmlhttpRequest/);
   assert.match(source, /@connect\s+github\.com/);
   assert.match(source, /@connect\s+raw\.githubusercontent\.com/);
-  assert.match(source, /USERSCRIPT_VERSION = "0\.5\.6-SNAPSHOT"/);
+  assert.match(source, /USERSCRIPT_VERSION = "0\.6\.0-SNAPSHOT"/);
   assert.match(source, /<div class="title">喵喵的逆袭工具 <span class="version">v\$\{USERSCRIPT_VERSION\}<\/span><\/div>/);
   assert.match(source, /ilovecat-game-export/);
   assert.match(source, /ilovecat-battle-strategy/);
@@ -70,7 +70,12 @@ test("the userscript is syntactically valid and exposes both workflows", () => {
   assert.match(source, /requirePlaying/);
   assert.match(source, /prep\.startButton\.click\(\)/);
   assert.match(source, /自动开始战斗/);
-  assert.match(source, /自动开始战斗[\s\S]*?自动倍速/);
+  assert.match(source, /自动开始战斗[\s\S]*?静默执行[\s\S]*?执行倍速/);
+  assert.match(source, /class="silent-run"/);
+  assert.match(source, /class="run-speed"/);
+  assert.match(source, /<option value="1">1x<\/option>[\s\S]*?<option value="2">2x<\/option>[\s\S]*?<option value="3">3x<\/option>[\s\S]*?<option value="auto" selected>自动<\/option>/);
+  assert.ok(source.includes('<button class="auto-run" type="button">自动执行</button>'));
+  assert.doesNotMatch(source, /class="auto-speed"|ui\.autoSpeed|自动倍速<\/label>/);
   assert.doesNotMatch(source, /无战斗时由脚本点击“开始战斗”|autoItems|auto-items/);
   assert.match(source, /selectPreparationItems/);
   assert.match(source, /await selectPreparationItems\(strategy, prep\)/);
@@ -94,6 +99,16 @@ test("the userscript is syntactically valid and exposes both workflows", () => {
   assert.match(source, /readBattleSpeed/);
   assert.match(source, /autoSpeed/);
   assert.match(source, /manageAutoSpeed/);
+  assert.match(source, /manageExecutionSpeed/);
+  assert.match(source, /manageFixedSpeed/);
+  assert.match(source, /parseSpeedChoice/);
+  assert.match(source, /hideWorkbench/);
+  assert.match(source, /restoreWorkbench/);
+  assert.match(source, /armAutoExecute/);
+  assert.match(source, /pollAutoExecution/);
+  assert.match(source, /cancelAutoExecution/);
+  assert.match(source, /AUTO_EXECUTE_TIMEOUT_MS/);
+  assert.match(source, /isNewBattleForAutoExecution/);
   assert.match(source, /estimateNextAction/);
   assert.match(source, /BATTLE_SPEED_KEY/);
   assert.match(source, /空闲 3×/);
@@ -166,6 +181,88 @@ test("the userscript is syntactically valid and exposes both workflows", () => {
   assert.match(source, /复制所选 JSON/);
   assert.match(source, /下载所选 JSON/);
   assert.doesNotMatch(source, /download-snapshot/);
+});
+
+test("speed choices map to auto or fixed execution speeds", () => {
+  const parseSpeedChoice = markedFunction("parseSpeedChoice");
+  assert.equal(parseSpeedChoice("auto"), "auto");
+  assert.equal(parseSpeedChoice("1"), 1);
+  assert.equal(parseSpeedChoice("2"), 2);
+  assert.equal(parseSpeedChoice("3"), 3);
+  for (const value of ["", "0", "4", "1.5", null, undefined]) {
+    assert.equal(parseSpeedChoice(value), "auto");
+  }
+});
+
+test("fixed execution speed waits for the target before acting", () => {
+  let now = 0;
+  let current = 1;
+  let clicks = 0;
+  const executor = {
+    nextActionAt: 0,
+    autoSpeedMissingSince: 0,
+    autoSpeedStuckSince: 0,
+    autoSpeedRaised: false,
+  };
+  const manageFixedSpeed = markedFunction("manageFixedSpeed", {
+    AUTO_SPEED_STUCK_MS: 1800,
+    performance: { now: () => now },
+    readBattleSpeedNumber: () => current,
+    cycleBattleSpeed: () => {
+      clicks++;
+      current = current === 3 ? 1 : current + 1;
+      return true;
+    },
+    executor,
+  });
+
+  assert.deepEqual(manageFixedSpeed(1), {
+    current: 1, target: 1, eta: null, reason: "固定倍速", busy: false,
+  });
+  assert.equal(clicks, 0);
+
+  now = 10;
+  assert.equal(manageFixedSpeed(3).busy, true);
+  assert.equal(clicks, 1);
+  assert.equal(current, 2);
+  assert.equal(executor.autoSpeedRaised, true);
+
+  executor.nextActionAt = 500;
+  now = 100;
+  assert.equal(manageFixedSpeed(3).waiting, true);
+  assert.equal(clicks, 1);
+
+  executor.nextActionAt = 0;
+  now = 260;
+  assert.equal(manageFixedSpeed(3).busy, true);
+  assert.equal(clicks, 2);
+  assert.equal(current, 3);
+
+  now = 520;
+  const settled = manageFixedSpeed(3);
+  assert.equal(settled.busy, false);
+  assert.equal(settled.current, 3);
+  assert.equal(clicks, 2);
+});
+
+test("auto execution ignores a battle that was already playing when armed", () => {
+  const isNewBattleForAutoExecution = markedFunction("isNewBattleForAutoExecution");
+  const baseline = { time: 12, seed: 7 };
+  const current = { context: { seed: 7 }, snapshot: { time: 12.5 } };
+  assert.equal(isNewBattleForAutoExecution(baseline, current), false);
+  assert.equal(isNewBattleForAutoExecution(baseline, {
+    context: { seed: 8 },
+    snapshot: { time: 12.5 },
+  }), true);
+  assert.equal(isNewBattleForAutoExecution(baseline, {
+    context: { seed: 7 },
+    snapshot: { time: 0 },
+  }), true);
+  assert.equal(isNewBattleForAutoExecution(undefined, current), true);
+  assert.equal(isNewBattleForAutoExecution({ time: 12 }, {
+    context: { seed: null },
+    snapshot: { time: 12.5 },
+  }), false);
 });
 
 test("automatic cannon waits for late live targets with a timed fallback", () => {
