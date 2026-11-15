@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         喵喵的逆袭 · 数据导出与策略执行
 // @namespace    https://github.com/ZeroJehovah/ilovecat-battle-sim
-// @version      0.7.0
+// @version      0.8.0
 // @description  按范围只读导出战斗数据与 JS，并从在线索引或本地文件选择策略操作战斗页面
 // @match        https://api.ilovecat520.me/*
 // @updateURL    https://raw.githubusercontent.com/ZeroJehovah/ilovecat-battle-sim/main/tools/ilovecat-workbench.user.js
@@ -22,7 +22,7 @@
 
   const STRATEGY_FORMAT = "ilovecat-battle-strategy";
   const EXPORT_FORMAT = "ilovecat-game-export";
-  const USERSCRIPT_VERSION = "0.7.0";
+  const USERSCRIPT_VERSION = "0.8.0";
   const STRATEGY_INDEX_URL = "https://github.com/ZeroJehovah/ilovecat-battle-sim-docs/raw/main/strategies/index.json";
   const STRATEGY_INDEX_TTL_MS = 5 * 60 * 1000;
   const ACTION_GAP_MS = 250;
@@ -77,6 +77,7 @@
   let onlineStrategyIndex = null;
   let onlineStrategyIndexPromise = null;
   let onlineStrategyIndexLoadedAt = 0;
+  let strategyExpiryTimer = null;
   let hiddenWorkbench = null;
   let autoExecution = null;
   let reviewCapture = null;
@@ -93,6 +94,8 @@
     destroy() {
       detachReviewTap();
       unregisterMenuCommands();
+      if (strategyExpiryTimer) clearTimeout(strategyExpiryTimer);
+      strategyExpiryTimer = null;
       cancelAutoExecution("", false);
       stopExecutor("", false);
       restoreWorkbench();
@@ -1066,7 +1069,10 @@
     for (const view of ui.views) view.hidden = view.dataset.view !== name;
     ui.executionPanel.hidden = name === "export";
     if (name === "export") ensureStageOptions().catch((error) => setExportStatus(error.message, true));
-    if (name === "online") ensureOnlineStrategies().catch(() => {});
+    if (name === "online") {
+      if (onlineStrategyIndex) renderOnlineStrategies();
+      ensureOnlineStrategies().catch(() => {});
+    }
   }
 
   async function runBusy(task) {
@@ -1184,6 +1190,10 @@
 
   function renderOnlineStrategies() {
     if (!onlineStrategyIndex) return;
+    const active = activeOnlineStrategies(onlineStrategyIndex);
+    if (selectedOnlineStrategyId && !active.some((entry) => entry.id === selectedOnlineStrategyId)) {
+      clearActiveStrategy("原在线策略已过期或移除，请重新选择策略。", true);
+    }
     const stages = buildOnlineStageFilters(onlineStrategyIndex);
     if (!stages.some((stage) => String(stage.id) === selectedOnlineStageId)) {
       selectedOnlineStageId = stages.length ? String(stages[0].id) : "";
@@ -1234,12 +1244,32 @@
       fragment.append(button);
     }
     if (!visible.length) {
-      fragment.append(onlineEmpty(onlineStrategyIndex.strategies.length
-        ? "当前关卡没有有效策略。"
-        : "索引中没有符合当前阵容等级的策略。"));
+      fragment.append(onlineEmpty(!onlineStrategyIndex.strategies.length
+        ? "索引中没有在线策略。"
+        : active.length
+          ? "当前关卡没有有效策略。"
+          : "索引中的策略均已过期。"));
     }
     ui.onlineStrategies.replaceChildren(fragment);
     syncStrategyControls();
+  }
+
+  function scheduleOnlineStrategyExpiry(index) {
+    if (strategyExpiryTimer) clearTimeout(strategyExpiryTimer);
+    strategyExpiryTimer = null;
+    const now = Date.now();
+    const next = (Array.isArray(index?.strategies) ? index.strategies : [])
+      .map((entry) => Date.parse(entry?.expiresAt ?? ""))
+      .filter((at) => Number.isFinite(at) && at > now)
+      .sort((left, right) => left - right)[0];
+    if (!Number.isFinite(next)) return;
+    const delay = Math.min(next - now + 25, 2147483647);
+    strategyExpiryTimer = setTimeout(() => {
+      strategyExpiryTimer = null;
+      if (!onlineStrategyIndex) return;
+      renderOnlineStrategies();
+      scheduleOnlineStrategyExpiry(onlineStrategyIndex);
+    }, delay);
   }
 
   function selectOnlineStage(stageId) {
@@ -1247,9 +1277,10 @@
     const stages = buildOnlineStageFilters(onlineStrategyIndex);
     if (!stages.some((stage) => String(stage.id) === String(stageId))) return;
     if (String(stageId) === selectedOnlineStageId) return;
-    const activeEntry = onlineStrategyIndex.strategies.find((entry) => entry.id === selectedOnlineStrategyId);
+    const activeEntry = activeOnlineStrategies(onlineStrategyIndex)
+      .find((entry) => entry.id === selectedOnlineStrategyId);
     selectedOnlineStageId = String(stageId);
-    if (activeEntry && Number(activeEntry.stage.id) !== Number(stageId)) {
+    if (selectedOnlineStrategyId && (!activeEntry || Number(activeEntry.stage.id) !== Number(stageId))) {
       clearActiveStrategy("已切换关卡筛选，请重新选择该关卡的策略。");
     }
     renderOnlineStrategies();
@@ -1271,9 +1302,10 @@
       const index = parseStrategyIndex(text);
       onlineStrategyIndex = index;
       onlineStrategyIndexLoadedAt = Date.now();
-      if (selectedOnlineStrategyId && !index.strategies.some((entry) => entry.id === selectedOnlineStrategyId)) {
-        clearActiveStrategy("原在线策略已从有效索引移除，请重新选择策略。", true);
+      if (selectedOnlineStrategyId && !activeOnlineStrategies(index).some((entry) => entry.id === selectedOnlineStrategyId)) {
+        clearActiveStrategy("原在线策略已过期或从有效索引移除，请重新选择策略。", true);
       }
+      scheduleOnlineStrategyExpiry(index);
       renderOnlineStrategies();
       return index;
     })();
@@ -1293,8 +1325,11 @@
 
   async function selectOnlineStrategy(id) {
     const index = onlineStrategyIndex ?? await ensureOnlineStrategies();
-    const entry = index.strategies.find((strategy) => strategy.id === id);
-    if (!entry) throw new Error("选中的在线策略已不在最新索引中，请刷新后重试。");
+    const entry = activeOnlineStrategies(index).find((strategy) => strategy.id === id);
+    if (!entry) {
+      const known = index.strategies.find((strategy) => strategy.id === id);
+      throw new Error(known ? "选中的在线策略已过期，请刷新后重新选择。" : "选中的在线策略已不在最新索引中，请刷新后重试。");
+    }
     setRunStatus("正在载入策略并自动校验…");
     try {
       const text = await requestRemoteText(entry.rawUrl);
@@ -1882,11 +1917,37 @@
     return `${(bytes / 1024 / 1024).toFixed(2)} MiB`;
   }
 
+  // testable:onlineStrategyExpiryError
+  function onlineStrategyExpiryError(selectedId = selectedOnlineStrategyId, index = onlineStrategyIndex, now = Date.now()) {
+    if (!selectedId) return "";
+    const entry = (Array.isArray(index?.strategies) ? index.strategies : [])
+      .find((item) => item.id === selectedId);
+    if (!entry) return "在线策略已从有效索引移除，请重新选择。";
+    if (isStrategyExpired(entry, now)) return "在线策略已过期，请重新选择。";
+    return "";
+  }
+  // end testable:onlineStrategyExpiryError
+
+  // testable:isStrategyExpired
+  function isStrategyExpired(entry, now = Date.now()) {
+    if (!entry?.expiresAt) return false;
+    const expiresAt = Date.parse(entry.expiresAt);
+    return Number.isFinite(expiresAt) && now >= expiresAt;
+  }
+  // end testable:isStrategyExpired
+
+  // testable:activeOnlineStrategies
+  function activeOnlineStrategies(index, now = Date.now()) {
+    return (Array.isArray(index?.strategies) ? index.strategies : [])
+      .filter((entry) => !isStrategyExpired(entry, now));
+  }
+  // end testable:activeOnlineStrategies
+
   // testable:buildOnlineStageFilters
-  function buildOnlineStageFilters(index) {
+  function buildOnlineStageFilters(index, now = Date.now()) {
     const stages = [];
     const byId = new Map();
-    for (const strategy of Array.isArray(index?.strategies) ? index.strategies : []) {
+    for (const strategy of activeOnlineStrategies(index, now)) {
       const id = Number(strategy?.stage?.id);
       const name = String(strategy?.stage?.name ?? "").trim();
       if (!Number.isInteger(id) || id < 1 || !name) continue;
@@ -1903,9 +1964,9 @@
   // end testable:buildOnlineStageFilters
 
   // testable:filterStrategiesByStage
-  function filterStrategiesByStage(index, stageId) {
+  function filterStrategiesByStage(index, stageId, now = Date.now()) {
     const expected = String(stageId);
-    return (Array.isArray(index?.strategies) ? index.strategies : [])
+    return activeOnlineStrategies(index, now)
       .filter((strategy) => String(strategy?.stage?.id) === expected);
   }
   // end testable:filterStrategiesByStage
@@ -1948,6 +2009,14 @@
       const title = String(entry?.title ?? "").trim();
       const description = String(entry?.description ?? "").trim();
       if (!title || !description) throw new Error(`${label} 缺少标题或描述。`);
+      let expiresAt = null;
+      if (entry?.expiresAt != null) {
+        const rawExpiresAt = String(entry.expiresAt).trim();
+        if (!rawExpiresAt || !Number.isFinite(Date.parse(rawExpiresAt))) {
+          throw new Error(`${label}.expiresAt 不是有效日期。`);
+        }
+        expiresAt = rawExpiresAt;
+      }
       const file = String(entry?.file ?? "").trim();
       if (!/^[A-Za-z0-9._-]+\.user-strategy\.json$/.test(file)) throw new Error(`${label}.file 无效。`);
       if (files.has(file)) throw new Error(`策略索引文件重复：${file}`);
@@ -1974,7 +2043,7 @@
       const tags = Array.isArray(entry?.tags)
         ? entry.tags.map((tag) => String(tag).trim()).filter(Boolean)
         : [];
-      return { id, title, description, file, rawUrl, stage: { id: stageId, name: stageName }, team, tags };
+      return { id, title, description, expiresAt, file, rawUrl, stage: { id: stageId, name: stageName }, team, tags };
     });
     return {
       format: value.format,
@@ -2210,6 +2279,8 @@
       const entry = onlineStrategyIndex?.strategies.find((item) => item.id === selectedOnlineStrategyId);
       if (!entry) {
         results.splice(1, 0, { type: "error", text: "在线策略已从有效索引移除，请刷新策略列表后重新选择。" });
+      } else if (isStrategyExpired(entry)) {
+        results.splice(1, 0, { type: "error", text: "在线策略已过期，请刷新策略列表后重新选择。" });
       } else {
         try {
           validateIndexedStrategy(onlineStrategyIndex, entry, strategy);
@@ -2837,6 +2908,7 @@
     if (selectedOnlineStrategyId) {
       const entry = onlineStrategyIndex?.strategies.find((item) => item.id === selectedOnlineStrategyId);
       if (!entry) throw new Error("在线策略已从有效索引移除，请刷新策略列表后重新选择。");
+      if (isStrategyExpired(entry)) throw new Error("在线策略已过期，请刷新策略列表后重新选择。");
       validateIndexedStrategy(onlineStrategyIndex, entry, strategy);
     }
     return strategy;
@@ -2857,6 +2929,7 @@
     cancelAutoExecution("", false);
     autoExecution = {
       strategy,
+      onlineStrategyId: selectedOnlineStrategyId || "",
       baseline: captureAutoExecutionBaseline(),
       armedAt: performance.now(),
       timer: null,
@@ -2908,6 +2981,11 @@
     try {
       if (performance.now() - current.armedAt > AUTO_EXECUTE_TIMEOUT_MS) {
         cancelAutoExecution("自动执行等待超时，已恢复脚本面板。", true);
+        return;
+      }
+      const expiryError = onlineStrategyExpiryError(current.onlineStrategyId);
+      if (expiryError) {
+        cancelAutoExecution(`自动执行已取消：${expiryError}`, true);
         return;
       }
       const runtime = findNewAutoExecutionBattle(current);

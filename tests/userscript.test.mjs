@@ -33,8 +33,13 @@ test("the userscript is syntactically valid and exposes both workflows", () => {
   assert.match(source, /@grant\s+GM_unregisterMenuCommand/);
   assert.match(source, /@connect\s+github\.com/);
   assert.match(source, /@connect\s+raw\.githubusercontent\.com/);
-  assert.match(source, /USERSCRIPT_VERSION = "0\.7\.0";/);
-  assert.doesNotMatch(source, /0\.7\.0-SNAPSHOT/);
+  assert.match(source, /USERSCRIPT_VERSION = "0\.8\.0";/);
+  assert.doesNotMatch(source, /0\.8\.0-SNAPSHOT/);
+  assert.match(source, /isStrategyExpired/);
+  assert.match(source, /activeOnlineStrategies/);
+  assert.match(source, /scheduleOnlineStrategyExpiry/);
+  assert.match(source, /onlineStrategyId: selectedOnlineStrategyId/);
+  assert.match(source, /onlineStrategyExpiryError\(current\.onlineStrategyId\)/);
   assert.match(source, /<div class="title">喵喵的逆袭工具 <span class="version">v\$\{USERSCRIPT_VERSION\}<\/span><\/div>/);
   assert.match(source, /ilovecat-game-export/);
   assert.match(source, /ilovecat-battle-strategy/);
@@ -423,6 +428,7 @@ test("the online index lists upgrade plans while strategy metadata must match ex
       id: "boss-fixed",
       title: "Boss fixed",
       description: "Use the fixed sequence.",
+      expiresAt: "2026-11-16T00:00:00+08:00",
       file,
       rawUrl: rawRoot + file,
       stage: { id: 9001, name: "Boss" },
@@ -435,6 +441,7 @@ test("the online index lists upgrade plans while strategy metadata must match ex
   });
   const index = parseStrategyIndex(rawIndex, rawRoot);
   assert.equal(index.strategies[0].rawUrl, rawRoot + file);
+  assert.equal(index.strategies[0].expiresAt, "2026-11-16T00:00:00+08:00");
   assert.deepEqual(index.strategies[0].team.map((cat) => cat.id), ["c7", "b4"]);
 
   const strategy = {
@@ -457,6 +464,15 @@ test("the online index lists upgrade plans while strategy metadata must match ex
   const external = JSON.parse(rawIndex);
   external.strategies[0].rawUrl = "https://example.test/boss.json";
   assert.throws(() => parseStrategyIndex(JSON.stringify(external), rawRoot), /rawUrl 必须指向私有策略库/);
+
+  for (const expiresAt of ["not-a-date", ""]) {
+    const invalidExpiry = JSON.parse(rawIndex);
+    invalidExpiry.strategies[0].expiresAt = expiresAt;
+    assert.throws(() => parseStrategyIndex(JSON.stringify(invalidExpiry), rawRoot), /expiresAt 不是有效日期/);
+  }
+  const withoutExpiry = JSON.parse(rawIndex);
+  delete withoutExpiry.strategies[0].expiresAt;
+  assert.equal(parseStrategyIndex(JSON.stringify(withoutExpiry), rawRoot).strategies[0].expiresAt, null);
 
   const upgraded = JSON.parse(rawIndex);
   upgraded.roster.levels.c7 = 49;
@@ -493,23 +509,57 @@ test("the online index lists upgrade plans while strategy metadata must match ex
   }
 });
 
-test("online strategy filters expose one stage at a time in index order", () => {
-  const buildOnlineStageFilters = markedFunction("buildOnlineStageFilters");
-  const filterStrategiesByStage = markedFunction("filterStrategiesByStage");
+test("online strategies expire at their optional expiresAt and disappear from filters", () => {
+  const isStrategyExpired = markedFunction("isStrategyExpired");
+  const activeOnlineStrategies = markedFunction("activeOnlineStrategies", { isStrategyExpired });
+  const buildOnlineStageFilters = markedFunction("buildOnlineStageFilters", { activeOnlineStrategies });
+  const filterStrategiesByStage = markedFunction("filterStrategiesByStage", { activeOnlineStrategies });
+  const expiresAt = "2026-11-16T00:00:00+08:00";
+  const expiry = Date.parse(expiresAt);
   const index = {
     strategies: [
-      { id: "boss-a", stage: { id: 9001, name: "世界王" } },
-      { id: "boss-b", stage: { id: 9001, name: "世界王" } },
+      { id: "boss-a", expiresAt, stage: { id: 9001, name: "世界王" } },
+      { id: "boss-b", expiresAt: "2026-11-15T22:00:00+08:00", stage: { id: 9001, name: "世界王" } },
       { id: "endless", stage: { id: 9101, name: "无尽" } },
     ],
   };
-  assert.deepEqual(buildOnlineStageFilters(index), [
-    { id: 9001, name: "世界王", count: 2 },
+
+  assert.equal(isStrategyExpired(index.strategies[0], expiry - 1), false);
+  assert.equal(isStrategyExpired(index.strategies[0], expiry), true);
+  assert.equal(isStrategyExpired(index.strategies[2], expiry), false);
+  assert.equal(isStrategyExpired({ expiresAt: "not-a-date" }, expiry), false);
+
+  assert.deepEqual(
+    activeOnlineStrategies(index, expiry - 1).map((entry) => entry.id),
+    ["boss-a", "endless"],
+  );
+  assert.deepEqual(buildOnlineStageFilters(index, expiry - 1), [
+    { id: 9001, name: "世界王", count: 1 },
     { id: 9101, name: "无尽", count: 1 },
   ]);
-  assert.deepEqual(filterStrategiesByStage(index, "9001").map((entry) => entry.id), ["boss-a", "boss-b"]);
-  assert.deepEqual(filterStrategiesByStage(index, 9101).map((entry) => entry.id), ["endless"]);
-  assert.deepEqual(filterStrategiesByStage(index, 1), []);
+  assert.deepEqual(filterStrategiesByStage(index, "9001", expiry - 1).map((entry) => entry.id), ["boss-a"]);
+  assert.deepEqual(filterStrategiesByStage(index, 9101, expiry - 1).map((entry) => entry.id), ["endless"]);
+  assert.deepEqual(filterStrategiesByStage(index, 1, expiry - 1), []);
+
+  assert.deepEqual(activeOnlineStrategies(index, expiry).map((entry) => entry.id), ["endless"]);
+  assert.deepEqual(buildOnlineStageFilters(index, expiry), [{ id: 9101, name: "无尽", count: 1 }]);
+  assert.deepEqual(filterStrategiesByStage(index, "9001", expiry), []);
+});
+
+test("an armed auto execution refuses an online strategy that expired", () => {
+  const isStrategyExpired = markedFunction("isStrategyExpired");
+  const onlineStrategyExpiryError = markedFunction("onlineStrategyExpiryError", { isStrategyExpired });
+  const now = Date.parse("2026-11-16T00:00:00+08:00");
+  const index = {
+    strategies: [
+      { id: "live", expiresAt: "2026-11-16T00:00:01+08:00" },
+      { id: "old", expiresAt: "2026-11-16T00:00:00+08:00" },
+    ],
+  };
+  assert.equal(onlineStrategyExpiryError("live", index, now), "");
+  assert.match(onlineStrategyExpiryError("old", index, now), /已过期/);
+  assert.match(onlineStrategyExpiryError("missing", index, now), /已从有效索引移除/);
+  assert.equal(onlineStrategyExpiryError("", index, now), "");
 });
 
 test("fixed campaign stages accept a compact comma-separated id list", () => {
