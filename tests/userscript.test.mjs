@@ -27,9 +27,13 @@ test("the userscript is syntactically valid and exposes both workflows", () => {
   assert.match(source, /@match\s+https:\/\/api\.ilovecat520\.me\/\*/);
   assert.match(source, /@updateURL\s+https:\/\/raw\.githubusercontent\.com\/ZeroJehovah\/ilovecat-battle-sim\/main\/tools\/ilovecat-workbench\.user\.js/);
   assert.match(source, /@grant\s+GM_xmlhttpRequest/);
+  assert.match(source, /@grant\s+GM_setValue/);
+  assert.match(source, /@grant\s+GM_getValue/);
+  assert.match(source, /@grant\s+GM_registerMenuCommand/);
+  assert.match(source, /@grant\s+GM_unregisterMenuCommand/);
   assert.match(source, /@connect\s+github\.com/);
   assert.match(source, /@connect\s+raw\.githubusercontent\.com/);
-  assert.match(source, /USERSCRIPT_VERSION = "0\.6\.0-SNAPSHOT"/);
+  assert.match(source, /USERSCRIPT_VERSION = "0\.7\.0-SNAPSHOT"/);
   assert.match(source, /<div class="title">喵喵的逆袭工具 <span class="version">v\$\{USERSCRIPT_VERSION\}<\/span><\/div>/);
   assert.match(source, /ilovecat-game-export/);
   assert.match(source, /ilovecat-battle-strategy/);
@@ -109,6 +113,17 @@ test("the userscript is syntactically valid and exposes both workflows", () => {
   assert.match(source, /cancelAutoExecution/);
   assert.match(source, /AUTO_EXECUTE_TIMEOUT_MS/);
   assert.match(source, /isNewBattleForAutoExecution/);
+  assert.match(source, /REVIEW_STORAGE_KEY/);
+  assert.match(source, /reviewEndpointKind/);
+  assert.match(source, /battleEngineFromReactValue/);
+  assert.match(source, /collectReviewBattleState/);
+  assert.match(source, /installReviewTap/);
+  assert.match(source, /buildReviewPackage/);
+  assert.match(source, /persistReviewPackage/);
+  assert.ok(source.includes('register("导出上局复核包", exportLastReviewPackage)'));
+  assert.ok(source.includes('register("重新打开脚本面板", reopenWorkbenchFromMenu)'));
+  assert.match(source, /没有可导出的上局复核包/);
+  assert.doesNotMatch(source, /if \(silent\) restoreWorkbench\(\)/);
   assert.match(source, /estimateNextAction/);
   assert.match(source, /BATTLE_SPEED_KEY/);
   assert.match(source, /空闲 3×/);
@@ -243,6 +258,95 @@ test("fixed execution speed waits for the target before acting", () => {
   assert.equal(settled.busy, false);
   assert.equal(settled.current, 3);
   assert.equal(clicks, 2);
+});
+
+test("review capture only listens to battle start and finish endpoints", () => {
+  const reviewEndpointKind = markedFunction("reviewEndpointKind");
+  assert.equal(reviewEndpointKind("/api/cat/battle/start"), "start");
+  assert.equal(reviewEndpointKind("https://api.ilovecat520.me/api/cat/battle/finish?x=1"), "finish");
+  assert.equal(reviewEndpointKind("/api/cat/battle/state"), "");
+  assert.equal(reviewEndpointKind(null), "");
+});
+
+test("the review capture can read the battle engine from React hooks", () => {
+  const battleEngineFromReactValue = markedFunction("battleEngineFromReactValue");
+  const engine = {
+    tick: 42,
+    actions: [[0, 0, 0]],
+    opts: { seed: 1 },
+    snapshot() {},
+  };
+  assert.equal(battleEngineFromReactValue({ current: engine }), engine);
+  assert.equal(battleEngineFromReactValue(engine), engine);
+  assert.equal(battleEngineFromReactValue({ time: 1, result: "playing" }), null);
+  assert.equal(battleEngineFromReactValue({ current: { tick: 1, actions: [] } }), null);
+});
+
+test("review packages keep the finish request but omit settlement response bodies", () => {
+  const cloneReviewValue = (value) => value == null ? value : JSON.parse(JSON.stringify(value));
+  const unwrapReviewResponse = markedFunction("unwrapReviewResponse", { cloneReviewValue });
+  const sanitizeReviewStartData = markedFunction("sanitizeReviewStartData", { cloneReviewValue });
+  const buildReviewPackage = markedFunction("buildReviewPackage", {
+    REVIEW_FORMAT: "ilovecat-battle-review",
+    REVIEW_VERSION: 1,
+    USERSCRIPT_VERSION: "test",
+    pageWindow: { location: { href: "https://example.test/playground/battle" } },
+    cloneReviewValue,
+    sanitizeReviewStartData,
+    sanitizeReviewStartRequest: markedFunction("sanitizeReviewStartRequest", { cloneReviewValue }),
+    unwrapReviewResponse,
+  });
+  const review = buildReviewPackage({
+    capturedAt: "2026-11-15T00:00:00.000Z",
+    start: {
+      request: {
+        id: "start-request",
+        body: { stage: { id: 1 }, team: ["c1"], items: [], borrow: { lender_id: 777, cat_id: "c9" } },
+      },
+      response: {
+        status: 200,
+        response: {
+          success: true,
+          data: {
+            run_id: "run-1",
+            seed: 123,
+            stage: { id: 1 },
+            team: [{ cat_id: "c1", level: 9 }],
+            items: [],
+            borrow: { lender_id: 777, cat_id: "c9" },
+            cans: 999,
+            best: 12345,
+          },
+        },
+      },
+    },
+    finish: {
+      request: {
+        id: "finish-request",
+        body: { run_id: "run-1", ticks: 100, actions: [[0, 0, 0]], gave_up: false },
+      },
+      response: {
+        status: 200,
+        at: "2026-11-15T00:01:00.000Z",
+        response: { success: true, data: { cans: 50, best: 54321 } },
+      },
+    },
+    battle: null,
+  });
+
+  assert.equal(review.format, "ilovecat-battle-review");
+  assert.equal(review.start.data.cans, undefined);
+  assert.equal(review.start.data.best, undefined);
+  assert.equal(review.start.data.seed, 123);
+  assert.deepEqual(review.start.data.borrow, { cat_id: "c9" });
+  assert.deepEqual(review.start.request.body.borrow, { cat_id: "c9" });
+  assert.equal(review.finish.request.body.ticks, 100);
+  assert.equal(review.finish.request.body.gave_up, false);
+  assert.equal(review.finish.response, undefined);
+  assert.equal(review.finish.status, 200);
+  assert.equal(review.battle.runId, "run-1");
+  assert.equal(review.battle.seed, 123);
+  assert.deepEqual(review.battle.team, [{ cat_id: "c1", level: 9 }]);
 });
 
 test("auto execution ignores a battle that was already playing when armed", () => {

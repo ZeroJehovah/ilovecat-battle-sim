@@ -1,12 +1,16 @@
 // ==UserScript==
 // @name         喵喵的逆袭 · 数据导出与策略执行
 // @namespace    https://github.com/ZeroJehovah/ilovecat-battle-sim
-// @version      0.6.0-SNAPSHOT
+// @version      0.7.0-SNAPSHOT
 // @description  按范围只读导出战斗数据与 JS，并从在线索引或本地文件选择策略操作战斗页面
 // @match        https://api.ilovecat520.me/*
 // @updateURL    https://raw.githubusercontent.com/ZeroJehovah/ilovecat-battle-sim/main/tools/ilovecat-workbench.user.js
 // @downloadURL  https://raw.githubusercontent.com/ZeroJehovah/ilovecat-battle-sim/main/tools/ilovecat-workbench.user.js
 // @grant        GM_xmlhttpRequest
+// @grant        GM_setValue
+// @grant        GM_getValue
+// @grant        GM_registerMenuCommand
+// @grant        GM_unregisterMenuCommand
 // @grant        unsafeWindow
 // @connect      github.com
 // @connect      raw.githubusercontent.com
@@ -18,7 +22,7 @@
 
   const STRATEGY_FORMAT = "ilovecat-battle-strategy";
   const EXPORT_FORMAT = "ilovecat-game-export";
-  const USERSCRIPT_VERSION = "0.6.0-SNAPSHOT";
+  const USERSCRIPT_VERSION = "0.7.0-SNAPSHOT";
   const STRATEGY_INDEX_URL = "https://github.com/ZeroJehovah/ilovecat-battle-sim-docs/raw/main/strategies/index.json";
   const STRATEGY_INDEX_TTL_MS = 5 * 60 * 1000;
   const ACTION_GAP_MS = 250;
@@ -31,6 +35,9 @@
   const AUTO_SPEED_ENTER_LEAD_SECONDS = 4;
   const AUTO_SPEED_STUCK_MS = 1800;
   const AUTO_EXECUTE_TIMEOUT_MS = 10 * 60 * 1000;
+  const REVIEW_FORMAT = "ilovecat-battle-review";
+  const REVIEW_VERSION = 1;
+  const REVIEW_STORAGE_KEY = "ilovecat-battle-review-last-v1";
   const ITEM_NAMES = {
     start_coins: "開場金幣",
     fast_coins: "加速補給",
@@ -72,13 +79,20 @@
   let onlineStrategyIndexLoadedAt = 0;
   let hiddenWorkbench = null;
   let autoExecution = null;
+  let reviewCapture = null;
+  let cachedReviewPackage = null;
+  let reviewRequestSeq = 0;
 
   pageWindow.__ilovecatWorkbenchV1?.destroy?.();
 
   const ui = createUi();
   wireUi();
+  installReviewTap();
+  registerMenuCommands();
   pageWindow.__ilovecatWorkbenchV1 = {
     destroy() {
+      detachReviewTap();
+      unregisterMenuCommands();
       cancelAutoExecution("", false);
       stopExecutor("", false);
       restoreWorkbench();
@@ -598,6 +612,452 @@
     hiddenWorkbench = null;
     ui.launcher.hidden = false;
     ui.panel.hidden = !panelWasOpen;
+  }
+
+  function registerMenuCommands() {
+    unregisterMenuCommands();
+    const register = typeof GM_registerMenuCommand === "function"
+      ? GM_registerMenuCommand
+      : globalThis.GM?.registerMenuCommand?.bind(globalThis.GM);
+    if (typeof register !== "function") return;
+    try {
+      const ids = [
+        register("导出上局复核包", exportLastReviewPackage),
+        register("重新打开脚本面板", reopenWorkbenchFromMenu),
+      ].filter((id) => id != null);
+      if (ids.length) pageWindow.__ilovecatMenuCommandIds = ids;
+    } catch (error) {
+      console.warn("篡改猴菜单命令注册失败", error);
+    }
+  }
+
+  function unregisterMenuCommands() {
+    const ids = pageWindow.__ilovecatMenuCommandIds;
+    if (!Array.isArray(ids) || !ids.length) return;
+    const unregister = typeof GM_unregisterMenuCommand === "function"
+      ? GM_unregisterMenuCommand
+      : globalThis.GM?.unregisterMenuCommand?.bind(globalThis.GM);
+    if (typeof unregister === "function") {
+      for (const id of ids) {
+        try {
+          unregister(id);
+        } catch {
+          // The manager may already have removed the command.
+        }
+      }
+    }
+    delete pageWindow.__ilovecatMenuCommandIds;
+  }
+
+  function reopenWorkbenchFromMenu() {
+    if (autoExecution) {
+      cancelAutoExecution("", false);
+      setRunStatus("已取消自动执行并重新打开脚本面板。");
+    }
+    hiddenWorkbench = null;
+    ui.launcher.hidden = false;
+    ui.panel.hidden = false;
+    showTab(currentTab);
+    syncStrategyControls();
+  }
+
+  function exportLastReviewPackage() {
+    const review = readStoredReviewPackage();
+    if (!review || review.format !== REVIEW_FORMAT) {
+      showReviewMenuError("没有可导出的上局复核包。");
+      return;
+    }
+    const text = JSON.stringify(review, null, 2) + "\n";
+    download(`ilovecat-review-${stamp()}.json`, text);
+  }
+
+  function showReviewMenuError(message) {
+    try {
+      pageWindow.alert(message);
+    } catch {
+      console.error(message);
+    }
+  }
+
+  function installReviewTap() {
+    const existing = pageWindow.__ilovecatReviewTapV1;
+    if (existing) {
+      existing.handler = handleReviewNetworkEvent;
+      return;
+    }
+    const tap = { handler: handleReviewNetworkEvent };
+    try {
+      const proto = pageWindow.XMLHttpRequest?.prototype;
+      if (proto && !proto.__ilovecatReviewTapPatched) {
+        const originalOpen = proto.open;
+        const originalSend = proto.send;
+        proto.open = function(method, url, ...args) {
+          this.__ilovecatReviewRequest = {
+            method: String(method ?? "GET").toUpperCase(),
+            url: String(url ?? ""),
+          };
+          return originalOpen.call(this, method, url, ...args);
+        };
+        proto.send = function(body) {
+          const request = this.__ilovecatReviewRequest;
+          const kind = reviewEndpointKind(request?.url);
+          if (!kind) return originalSend.call(this, body);
+          const requestEvent = createReviewNetworkEvent({
+            transport: "xhr",
+            phase: "request",
+            kind,
+            method: request.method,
+            url: request.url,
+            body: parseReviewBody(body),
+          });
+          tap.handler(requestEvent);
+          this.addEventListener("loadend", () => {
+            tap.handler(createReviewNetworkEvent({
+              transport: "xhr",
+              phase: "response",
+              kind,
+              method: request.method,
+              url: request.url,
+              requestId: requestEvent.id,
+              status: this.status,
+              response: readReviewXhrResponse(this),
+            }));
+          }, { once: true });
+          return originalSend.call(this, body);
+        };
+        proto.__ilovecatReviewTapPatched = true;
+      }
+    } catch (error) {
+      console.warn("复核包 XHR 监听安装失败", error);
+    }
+    try {
+      const originalFetch = pageWindow.fetch;
+      if (typeof originalFetch === "function" && !originalFetch.__ilovecatReviewTapPatched) {
+        const patchedFetch = function(input, init) {
+          const url = typeof input === "string" ? input : String(input?.url ?? input);
+          const method = String(init?.method || input?.method || "GET").toUpperCase();
+          const kind = reviewEndpointKind(url);
+          const requestEvent = kind
+            ? createReviewNetworkEvent({
+              transport: "fetch",
+              phase: "request",
+              kind,
+              method,
+              url,
+              body: parseReviewBody(init?.body),
+            })
+            : null;
+          if (requestEvent) tap.handler(requestEvent);
+          const result = originalFetch.apply(this, arguments);
+          if (requestEvent) {
+            result.then((response) => {
+              response.clone().text().then((text) => {
+                tap.handler(createReviewNetworkEvent({
+                  transport: "fetch",
+                  phase: "response",
+                  kind,
+                  method,
+                  url,
+                  requestId: requestEvent.id,
+                  status: response.status,
+                  response: parseReviewBody(text),
+                }));
+              }).catch(() => {});
+            }, () => {});
+          }
+          return result;
+        };
+        patchedFetch.__ilovecatReviewTapPatched = true;
+        pageWindow.fetch = patchedFetch;
+      }
+    } catch (error) {
+      console.warn("复核包 fetch 监听安装失败", error);
+    }
+    pageWindow.__ilovecatReviewTapV1 = tap;
+  }
+
+  function detachReviewTap() {
+    if (pageWindow.__ilovecatReviewTapV1) {
+      pageWindow.__ilovecatReviewTapV1.handler = () => {};
+    }
+    reviewCapture = null;
+  }
+
+  function createReviewNetworkEvent(data) {
+    return {
+      id: `review-${Date.now()}-${reviewRequestSeq++}`,
+      at: new Date().toISOString(),
+      ...data,
+    };
+  }
+
+  // testable:reviewEndpointKind
+  function reviewEndpointKind(url) {
+    const text = String(url ?? "");
+    if (text.includes("/api/cat/battle/finish")) return "finish";
+    if (text.includes("/api/cat/battle/start")) return "start";
+    return "";
+  }
+  // end testable:reviewEndpointKind
+
+  function parseReviewBody(body) {
+    if (body == null || body === "") return null;
+    if (typeof body === "string") {
+      try {
+        return JSON.parse(body);
+      } catch {
+        return body;
+      }
+    }
+    try {
+      if (typeof pageWindow.URLSearchParams !== "undefined" && body instanceof pageWindow.URLSearchParams) {
+        return Object.fromEntries(body.entries());
+      }
+      if (typeof pageWindow.FormData !== "undefined" && body instanceof pageWindow.FormData) {
+        return Object.fromEntries([...body.entries()]);
+      }
+      return JSON.parse(JSON.stringify(body));
+    } catch {
+      return { type: Object.prototype.toString.call(body) };
+    }
+  }
+
+  function readReviewXhrResponse(xhr) {
+    try {
+      if (xhr.responseType === "" || xhr.responseType === "text") {
+        return parseReviewBody(xhr.responseText);
+      }
+      return parseReviewBody(xhr.response);
+    } catch {
+      return null;
+    }
+  }
+
+  function handleReviewNetworkEvent(event) {
+    if (!event) return;
+    if (event.phase === "request" && event.kind === "start") {
+      reviewCapture = {
+        capturedAt: event.at,
+        start: { request: event, response: null },
+        finish: null,
+        battle: null,
+      };
+      return;
+    }
+    if (event.phase === "response" && event.kind === "start") {
+      if (reviewCapture && !reviewCapture.finish) {
+        reviewCapture.start.response = event;
+      }
+      return;
+    }
+    if (event.phase === "request" && event.kind === "finish") {
+      const capture = reviewCapture ?? {
+        capturedAt: event.at,
+        start: null,
+        finish: null,
+        battle: null,
+      };
+      capture.finish = { request: event, response: null };
+      capture.battle = collectReviewBattleState(event.body?.run_id);
+      persistReviewPackage(buildReviewPackage(capture));
+      return;
+    }
+    if (event.phase === "response" && event.kind === "finish") {
+      if (cachedReviewPackage?.finish?.request?.id === event.requestId) {
+        cachedReviewPackage.finish.status = Number.isFinite(Number(event.status)) ? Number(event.status) : null;
+        cachedReviewPackage.finish.completedAt = event.at ?? null;
+        persistReviewPackage(cachedReviewPackage);
+      }
+    }
+  }
+
+  function collectReviewBattleState(expectedRunId = "") {
+    try {
+      const runtime = findReviewRuntime(expectedRunId);
+      const engine = runtime.engine;
+      const opts = engine?.opts ?? null;
+      const finalSnapshot = typeof engine?.snapshot === "function" ? engine.snapshot() : runtime.snapshot;
+      return {
+        found: Boolean(engine || runtime.context),
+        runId: String(runtime.context?.runId ?? ""),
+        seed: Number.isFinite(Number(opts?.seed))
+          ? Number(opts.seed)
+          : (runtime.context?.seed ?? null),
+        stage: cloneReviewValue(opts?.stage ?? null),
+        team: cloneReviewValue(opts?.team ?? null),
+        contextTeam: cloneReviewValue(runtime.context?.team ?? null),
+        items: cloneReviewValue(opts?.items ?? runtime.context?.items ?? null),
+        catalog: summarizeReviewCatalog(opts?.catalog),
+        final: cloneReviewValue(finalSnapshot),
+        engine: engine ? {
+          tick: Number(engine.tick),
+          time: Number(engine.time),
+          result: String(engine.result ?? ""),
+          actions: cloneReviewValue(engine.actions ?? []),
+          stats: cloneReviewValue(engine.stats ?? null),
+          bossDamage: Number(engine.bossDamage ?? 0),
+          units: summarizeReviewUnits(engine.units),
+        } : null,
+      };
+    } catch (error) {
+      return { found: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  }
+
+  function summarizeReviewCatalog(catalog) {
+    if (!catalog || typeof catalog !== "object") return null;
+    return cloneReviewValue({
+      ...(catalog.schemaVersion != null ? { schemaVersion: catalog.schemaVersion } : {}),
+      rules: catalog.rules,
+      cats: catalog.cats,
+      mice: catalog.mice,
+      items: catalog.items,
+    });
+  }
+
+  function findReviewRuntime(expectedRunId = "") {
+    let fallback = null;
+    for (const screen of pageDocument.querySelectorAll(".cat-battle-screen")) {
+      const runtime = readBattleRuntime(screen);
+      if (!runtime.context && !runtime.engine) continue;
+      if (!expectedRunId || String(runtime.context?.runId ?? "") === String(expectedRunId)) return runtime;
+      fallback ??= runtime;
+    }
+    return fallback ?? { context: null, snapshot: null, engine: null };
+  }
+
+  function summarizeReviewUnits(units) {
+    if (!Array.isArray(units)) return null;
+    return cloneReviewValue(units.map((unit) => ({
+      uid: unit?.uid,
+      id: unit?.id,
+      side: unit?.side,
+      x: unit?.x,
+      hp: unit?.hp,
+      maxHp: unit?.maxHp,
+      dead: unit?.dead,
+      ...(unit?.kind ? { kind: unit.kind } : {}),
+      ...(unit?.phantom ? { phantom: unit.phantom } : {}),
+    })));
+  }
+
+  function cloneReviewValue(value) {
+    if (value == null) return value;
+    try {
+      return JSON.parse(JSON.stringify(value));
+    } catch {
+      return null;
+    }
+  }
+
+  // testable:unwrapReviewResponse
+  function unwrapReviewResponse(event) {
+    const body = event?.response;
+    if (body && typeof body === "object" && body.success === true && "data" in body) {
+      return cloneReviewValue(body.data);
+    }
+    return cloneReviewValue(body);
+  }
+  // end testable:unwrapReviewResponse
+
+  // testable:sanitizeReviewStartData
+  function sanitizeReviewStartData(data) {
+    if (!data || typeof data !== "object" || Array.isArray(data)) return null;
+    const output = {};
+    for (const key of ["run_id", "seed", "stage", "team", "items", "borrow"]) {
+      if (data[key] === undefined) continue;
+      if (key === "borrow") {
+        const catId = data.borrow?.cat_id;
+        if (catId != null) output.borrow = { cat_id: String(catId) };
+      } else {
+        output[key] = cloneReviewValue(data[key]);
+      }
+    }
+    return output;
+  }
+  // end testable:sanitizeReviewStartData
+
+  // testable:sanitizeReviewStartRequest
+  function sanitizeReviewStartRequest(event) {
+    const clone = cloneReviewValue(event);
+    if (clone?.body && typeof clone.body === "object" && clone.body.borrow) {
+      const catId = clone.body.borrow.cat_id;
+      clone.body.borrow = catId != null ? { cat_id: String(catId) } : null;
+    }
+    return clone;
+  }
+  // end testable:sanitizeReviewStartRequest
+
+  // testable:buildReviewPackage
+  function buildReviewPackage(capture) {
+    const startResponse = capture.start?.response ?? null;
+    const finishResponse = capture.finish?.response ?? null;
+    const startData = sanitizeReviewStartData(unwrapReviewResponse(startResponse));
+    const startBody = capture.start?.request?.body ?? null;
+    const battle = cloneReviewValue(capture.battle) ?? {};
+    if (battle.stage == null) battle.stage = cloneReviewValue(startData?.stage ?? startBody?.stage);
+    if (battle.team == null) battle.team = cloneReviewValue(startData?.team ?? startBody?.team);
+    if (battle.items == null) battle.items = cloneReviewValue(startData?.items ?? startBody?.items);
+    if (battle.seed == null) battle.seed = startData?.seed ?? null;
+    if (!battle.runId) battle.runId = String(capture.finish?.request?.body?.run_id ?? startData?.run_id ?? "");
+    return {
+      format: REVIEW_FORMAT,
+      version: REVIEW_VERSION,
+      capturedAt: new Date().toISOString(),
+      startedAt: capture.capturedAt ?? null,
+      pageUrl: `${pageWindow.location.origin}${pageWindow.location.pathname}`,
+      userscriptVersion: USERSCRIPT_VERSION,
+      start: capture.start ? {
+        request: sanitizeReviewStartRequest(capture.start.request),
+        status: Number.isFinite(Number(startResponse?.status)) ? Number(startResponse.status) : null,
+        data: startData,
+      } : null,
+      finish: capture.finish ? {
+        request: cloneReviewValue(capture.finish.request),
+        status: Number.isFinite(Number(finishResponse?.status)) ? Number(finishResponse.status) : null,
+        completedAt: finishResponse?.at ?? null,
+      } : null,
+      battle,
+    };
+  }
+  // end testable:buildReviewPackage
+
+  function persistReviewPackage(review) {
+    cachedReviewPackage = review;
+    const text = JSON.stringify(review);
+    try {
+      if (typeof GM_setValue === "function") {
+        GM_setValue(REVIEW_STORAGE_KEY, text);
+      } else if (typeof globalThis.GM?.setValue === "function") {
+        globalThis.GM.setValue(REVIEW_STORAGE_KEY, text);
+      } else {
+        pageWindow.localStorage.setItem(REVIEW_STORAGE_KEY, text);
+      }
+    } catch (error) {
+      console.warn("上局复核包写入失败", error);
+    }
+  }
+
+  function readStoredReviewPackage() {
+    let raw = null;
+    try {
+      if (typeof GM_getValue === "function") {
+        raw = GM_getValue(REVIEW_STORAGE_KEY, "");
+      } else if (typeof globalThis.GM?.getValue === "function") {
+        raw = globalThis.GM.getValue(REVIEW_STORAGE_KEY, "");
+      } else {
+        raw = pageWindow.localStorage.getItem(REVIEW_STORAGE_KEY);
+      }
+    } catch {
+      raw = null;
+    }
+    if (!raw) return cachedReviewPackage;
+    if (typeof raw === "object") return raw;
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return null;
+    }
   }
 
   function showTab(name) {
@@ -2295,7 +2755,6 @@
       autoSpeedRaised: speedChoice !== "auto" && speedChoice !== 1,
       autoSpeedStuckSince: 0,
       autoSpeedMissingSince: 0,
-      silent: Boolean(hiddenWorkbench),
       timer: null,
       stopped: false,
     };
@@ -2337,7 +2796,6 @@
       autoSpeedRaised: speedChoice !== "auto" && speedChoice !== 1,
       autoSpeedStuckSince: 0,
       autoSpeedMissingSince: 0,
-      silent: Boolean(hiddenWorkbench),
       timer: null,
       stopped: false,
     };
@@ -2349,7 +2807,6 @@
 
   function stopExecutor(message, updateStatus = true) {
     const raised = Boolean(executor?.autoSpeedRaised);
-    const silent = Boolean(executor?.silent);
     const token = ++speedRestoreToken;
     if (executor?.timer) clearTimeout(executor.timer);
     if (executor) executor.stopped = true;
@@ -2361,7 +2818,6 @@
       restoreSpeedTo1(token);
     }
     if (message && updateStatus) setRunStatus(message);
-    if (silent) restoreWorkbench();
   }
 
   async function restoreSpeedTo1(token) {
@@ -3031,6 +3487,18 @@
     }
   }
 
+  // testable:battleEngineFromReactValue
+  function battleEngineFromReactValue(value) {
+    const engine = value?.current ?? value;
+    if (!engine || typeof engine !== "object") return null;
+    if (!Number.isFinite(engine.tick)) return null;
+    if (!Array.isArray(engine.actions)) return null;
+    if (!engine.opts || typeof engine.opts !== "object") return null;
+    if (typeof engine.snapshot !== "function") return null;
+    return engine;
+  }
+  // end testable:battleEngineFromReactValue
+
   function findBattleRuntime(expectedStageId = null, { requirePlaying = false } = {}) {
     const screens = [...pageDocument.querySelectorAll(".cat-battle-screen")];
     for (const screen of screens) {
@@ -3040,15 +3508,16 @@
       if (requirePlaying && runtime.snapshot?.result !== "playing") continue;
       return runtime;
     }
-    return { context: null, snapshot: null };
+    return { context: null, snapshot: null, engine: null };
   }
 
   function readBattleRuntime(screen) {
     const fiberKey = Object.keys(screen).find((key) => key.startsWith("__reactFiber$"));
-    if (!fiberKey) return { context: null, snapshot: null };
+    if (!fiberKey) return { context: null, snapshot: null, engine: null };
     let context = null;
     let snapshot = null;
     let battleUnits = null;
+    let engine = null;
     let fiber = screen[fiberKey];
     let depth = 0;
     while (fiber && depth++ < 40) {
@@ -3059,6 +3528,7 @@
             stageId: Number(props.stage?.id),
             stageName: String(props.stage?.name ?? ""),
             seed: Number.isFinite(Number(props.seed)) ? Number(props.seed) : null,
+            runId: String(props.runId ?? ""),
             team: props.team.map((entry, slot) => {
               const cat = entry?.cat ?? {};
               return {
@@ -3075,27 +3545,28 @@
           };
         }
       }
-      if (!snapshot) {
+      if (!snapshot || !battleUnits || !engine) {
         let hook = fiber.memoizedState;
         let hookIndex = 0;
         while (hook && hookIndex++ < 160) {
           const value = hook.memoizedState;
           battleUnits ??= battleUnitsFromReactValue(value);
+          engine ??= battleEngineFromReactValue(value);
           if (isSnapshot(value)) {
             snapshot = value;
-            if (battleUnits) break;
+            if (battleUnits && engine) break;
           }
           hook = hook.next;
         }
       }
-      if (context && snapshot && battleUnits) break;
+      if (context && snapshot && battleUnits && engine) break;
       fiber = fiber.return;
     }
     if (snapshot && !Number.isFinite(snapshot.cannonTargets)) {
       const targets = cannonTargetCount({ cannonTargets: snapshot.cannonTargets, units: battleUnits });
       if (targets != null) snapshot = { ...snapshot, cannonTargets: targets };
     }
-    return { context, snapshot };
+    return { context, snapshot, engine };
   }
 
   function isSnapshot(value) {
