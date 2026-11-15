@@ -33,7 +33,8 @@ test("the userscript is syntactically valid and exposes both workflows", () => {
   assert.match(source, /@grant\s+GM_unregisterMenuCommand/);
   assert.match(source, /@connect\s+github\.com/);
   assert.match(source, /@connect\s+raw\.githubusercontent\.com/);
-  assert.match(source, /USERSCRIPT_VERSION = "0\.7\.0-SNAPSHOT"/);
+  assert.match(source, /USERSCRIPT_VERSION = "0\.7\.0";/);
+  assert.doesNotMatch(source, /0\.7\.0-SNAPSHOT/);
   assert.match(source, /<div class="title">喵喵的逆袭工具 <span class="version">v\$\{USERSCRIPT_VERSION\}<\/span><\/div>/);
   assert.match(source, /ilovecat-game-export/);
   assert.match(source, /ilovecat-battle-strategy/);
