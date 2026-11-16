@@ -33,8 +33,10 @@ test("the userscript is syntactically valid and exposes both workflows", () => {
   assert.match(source, /@grant\s+GM_unregisterMenuCommand/);
   assert.match(source, /@connect\s+github\.com/);
   assert.match(source, /@connect\s+raw\.githubusercontent\.com/);
-  assert.match(source, /USERSCRIPT_VERSION = "0\.9\.0-SNAPSHOT";/);
-  assert.match(source, /@version\s+0\.9\.0-SNAPSHOT/);
+  const metadataVersion = source.match(/^\/\/ @version[ \t]+(\S+)[ \t]*$/m)?.[1];
+  assert.match(metadataVersion ?? "", /^\d+\.\d+\.\d+$/);
+  const runtimeVersion = source.match(/\bconst USERSCRIPT_VERSION = "([^"]+)";/)?.[1];
+  assert.equal(runtimeVersion, metadataVersion);
   assert.match(source, /isStrategyExpired/);
   assert.match(source, /activeOnlineStrategies/);
   assert.match(source, /scheduleOnlineStrategyExpiry/);
