@@ -1,5 +1,10 @@
 {
-  "capturedAt": "2026-11-13T06:03:07.046Z",
+  "captureCoverage": {
+    "catalog": "2026-11-16T12:19:27.633Z",
+    "currentEndless": "2026-11-16T12:19:27.633Z",
+    "fixedCampaignStages": "2026-11-13T06:03:07.046Z"
+  },
+  "capturedAt": "2026-11-16T12:19:27.633Z",
   "catalog": {
     "cats": [
       {
@@ -402,6 +407,32 @@
         "release": "2026-11-09",
         "speed": 42,
         "story": "沙金色的小貓，奶白肚皮上總沾著沙，脖子繫著湖水藍圍巾。牠把每座沙丘都當成溜滑梯，滑下來時順便把沙踢進老鼠的鞋子裡。",
+        "tier": "C"
+      },
+      {
+        "ability": "ranged",
+        "ability_text": "拋出魚鉤，從射程 180 攻擊老鼠；在 200 以內，打得到墨汁鼠。",
+        "ability_value": 0,
+        "atk": 22,
+        "cooldown": 5.5,
+        "cost": 150,
+        "hp": 220,
+        "id": "c11",
+        "interval": 1.8,
+        "knockbacks": 2,
+        "look": {
+          "accent": "#f2f5f7",
+          "accessory": "hat",
+          "fur": "#929ca6",
+          "pattern": "stripes",
+          "size": 0.95
+        },
+        "name": "漁夫喵",
+        "origin": "第五章在潮汐碼頭加入的漁港嚮導，沿著海溝的魚群帶軍團前往深海王國。",
+        "range": 180,
+        "release": "2026-11-16",
+        "speed": 38,
+        "story": "銀灰虎斑小貓有雪白的嘴邊與肚皮，戴著草編漁帽，肩上扛一根繫著藍色浮標的釣竿。牠不怕海水變黑，只怕章魚鼠把魚餌偷吃光。",
         "tier": "C"
       },
       {
@@ -6199,8 +6230,8 @@
     ]
   },
   "endlessMeta": {
-    "ends": "2026-11-15",
-    "season": "2026-11-09"
+    "ends": "2026-11-22",
+    "season": "2026-11-16"
   },
   "schemaVersion": 1,
   "source": "https://api.ilovecat520.me/playground/battle",
@@ -6210,7 +6241,7 @@
     "id": 9101,
     "look": 10,
     "min_seconds": 0,
-    "modifier": "moon",
+    "modifier": "heatwave",
     "name": "無盡模式",
     "reward": 0,
     "scale": 1,

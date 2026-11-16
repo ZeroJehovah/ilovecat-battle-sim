@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         喵喵的逆袭 · 数据导出与策略执行
 // @namespace    https://github.com/ZeroJehovah/ilovecat-battle-sim
-// @version      0.8.0
+// @version      0.9.0-SNAPSHOT
 // @description  按范围只读导出战斗数据与 JS，并从在线索引或本地文件选择策略操作战斗页面
 // @match        https://api.ilovecat520.me/*
 // @updateURL    https://raw.githubusercontent.com/ZeroJehovah/ilovecat-battle-sim/main/tools/ilovecat-workbench.user.js
@@ -22,7 +22,7 @@
 
   const STRATEGY_FORMAT = "ilovecat-battle-strategy";
   const EXPORT_FORMAT = "ilovecat-game-export";
-  const USERSCRIPT_VERSION = "0.8.0";
+  const USERSCRIPT_VERSION = "0.9.0-SNAPSHOT";
   const STRATEGY_INDEX_URL = "https://github.com/ZeroJehovah/ilovecat-battle-sim-docs/raw/main/strategies/index.json";
   const STRATEGY_INDEX_TTL_MS = 5 * 60 * 1000;
   const ACTION_GAP_MS = 250;
@@ -2061,7 +2061,7 @@
 
   // testable:validateIndexedStrategy
   function validateIndexedStrategy(index, entry, strategy) {
-    if (!strategy || strategy.format !== "ilovecat-battle-strategy" || strategy.version !== 1) {
+    if (!strategy || strategy.format !== "ilovecat-battle-strategy" || ![1, 2].includes(strategy.version)) {
       throw new Error("在线策略格式无效。");
     }
     if (Number(strategy.stageId) !== Number(entry.stage.id)) {
@@ -2131,6 +2131,77 @@
     return response.text();
   }
 
+  // testable:normalizeDeployIntervals
+  function normalizeDeployIntervals(value = {}) {
+    if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("policy.deployIntervals must be an object");
+    for (const [id, seconds] of Object.entries(value)) {
+      if (!id || !Number.isFinite(seconds) || seconds < 0) throw new Error(`policy.deployIntervals.${id} must be non-negative`);
+    }
+    return { ...value };
+  }
+  // end testable:normalizeDeployIntervals
+
+  // testable:normalizePolicyPhases
+  function normalizePolicyPhases(phases = []) {
+    if (!Array.isArray(phases)) throw new Error("policy.phases must be an array");
+    const allowed = new Set(["at", "walletTarget", "economyFirst", "automatic", "targetCounts", "priority",
+      "fallbackAfter", "fallbackPriority", "autoCannon", "autoCannonAfter", "autoCannonMinTargets", "autoCannonFallbackAfter", "deployIntervals"]);
+    let previous = -1;
+    return phases.map((phase, index) => {
+      const label = `policy.phases[${index}]`;
+      if (!phase || typeof phase !== "object" || Array.isArray(phase)) throw new Error(`${label} must be an object`);
+      for (const key of Object.keys(phase)) if (!allowed.has(key)) throw new Error(`${label}.${key} is unsupported`);
+      if (!Number.isFinite(phase.at) || phase.at < 0 || phase.at <= previous) {
+        throw new Error(`${label}.at must be non-negative and strictly increasing`);
+      }
+      previous = phase.at;
+      const normalized = { ...phase };
+      if ("deployIntervals" in phase) normalized.deployIntervals = normalizeDeployIntervals(phase.deployIntervals);
+      for (const key of ["economyFirst", "automatic", "autoCannon"]) {
+        if (key in phase && typeof phase[key] !== "boolean") throw new Error(`${label}.${key} must be a boolean`);
+      }
+      if ("walletTarget" in phase && (!Number.isInteger(phase.walletTarget) || phase.walletTarget < 1 || phase.walletTarget > 8)) {
+        throw new Error(`${label}.walletTarget must be an integer from 1 to 8`);
+      }
+      for (const key of ["fallbackAfter", "autoCannonAfter", "autoCannonFallbackAfter"]) {
+        if (key in phase && (!Number.isFinite(phase[key]) || phase[key] < 0)) throw new Error(`${label}.${key} must be non-negative`);
+      }
+      if ("autoCannonMinTargets" in phase && (!Number.isInteger(phase.autoCannonMinTargets) || phase.autoCannonMinTargets < 0)) {
+        throw new Error(`${label}.autoCannonMinTargets must be a non-negative integer`);
+      }
+      for (const key of ["priority", "fallbackPriority"]) {
+        if (!(key in phase)) continue;
+        if (!Array.isArray(phase[key]) || phase[key].some((id) => typeof id !== "string" || !id)) {
+          throw new Error(`${label}.${key} must be an array of cat ids`);
+        }
+        normalized[key] = [...new Set(phase[key])];
+      }
+      if ("targetCounts" in phase) {
+        if (!phase.targetCounts || typeof phase.targetCounts !== "object" || Array.isArray(phase.targetCounts)) {
+          throw new Error(`${label}.targetCounts must be an object`);
+        }
+        for (const [id, count] of Object.entries(phase.targetCounts)) {
+          if (!id || !Number.isInteger(count) || count < 0) throw new Error(`${label}.targetCounts.${id} must be a non-negative integer`);
+        }
+        normalized.targetCounts = { ...phase.targetCounts };
+      }
+      return normalized;
+    });
+  }
+  // end testable:normalizePolicyPhases
+
+  // testable:applyPolicyPhases
+  function applyPolicyPhases(execution, time) {
+    const phases = execution.policy.phases ?? [];
+    execution.phaseIndex ??= 0;
+    while (execution.phaseIndex < phases.length && phases[execution.phaseIndex].at <= time + 1e-9) {
+      const { at, ...override } = phases[execution.phaseIndex++];
+      Object.assign(execution.policy, override);
+    }
+  }
+  // end testable:applyPolicyPhases
+
+  // testable:parseStrategyDocument
   function parseStrategy(rawText) {
     let value;
     try {
@@ -2142,11 +2213,14 @@
         : "";
       throw new Error(`策略不是合法 JSON：${detail}${hint}`);
     }
-    if (!value || value.format !== STRATEGY_FORMAT || value.version !== 1) {
-      throw new Error(`策略格式必须是 ${STRATEGY_FORMAT} 且 version=1。`);
+    if (!value || value.format !== STRATEGY_FORMAT || ![1, 2].includes(value.version)) {
+      throw new Error(`策略格式必须是 ${STRATEGY_FORMAT}，version 为 1 或 2。`);
     }
     if (!value.policy || typeof value.policy !== "object") throw new Error("策略缺少 policy 对象。");
     const policy = value.policy;
+    policy.phases = normalizePolicyPhases(policy.phases);
+    policy.deployIntervals = normalizeDeployIntervals(policy.deployIntervals);
+    if (value.version === 1 && (policy.phases.length || Object.keys(policy.deployIntervals).length)) throw new Error("分阶段策略必须使用 version=2；请更新执行器并重新加载策略。");
     policy.walletTarget = clampInt(policy.walletTarget ?? 8, 1, 8, "policy.walletTarget");
     policy.economyFirst = policy.economyFirst !== false;
     policy.autoCannon = Boolean(policy.autoCannon);
@@ -2213,6 +2287,9 @@
       ...policy.deploySequence,
       ...Object.keys(policy.targetCounts),
       ...policy.actions.map((action) => action.id).filter(Boolean),
+      ...Object.keys(policy.deployIntervals ?? {}),
+      ...(policy.phases ?? []).flatMap((phase) => [...Object.keys(phase.targetCounts ?? {}), ...Object.keys(phase.deployIntervals ?? {}),
+        ...(phase.priority ?? []), ...(phase.fallbackPriority ?? [])]),
     ];
     if (value.team) {
       const ids = new Set(value.team.map((entry) => entry.id));
@@ -2221,6 +2298,7 @@
     }
     return value;
   }
+  // end testable:parseStrategyDocument
 
   function stringArray(value, label) {
     if (!Array.isArray(value) || value.some((item) => typeof item !== "string")) {
@@ -2387,6 +2465,10 @@
     for (const action of Array.isArray(policy.actions) ? policy.actions : []) {
       if (action?.id) referenced.add(String(action.id));
     }
+    for (const id of Object.keys(policy.deployIntervals ?? {})) referenced.add(String(id));
+    for (const phase of policy.phases ?? []) {
+      for (const id of [...Object.keys(phase.targetCounts ?? {}), ...Object.keys(phase.deployIntervals ?? {}), ...(phase.priority ?? []), ...(phase.fallbackPriority ?? [])]) referenced.add(String(id));
+    }
     const catName = (id) => {
       const cat = cats.get(String(id));
       const name = typeof cat === "string" ? cat : cat?.name;
@@ -2524,6 +2606,9 @@
       ...policy.deploySequence,
       ...Object.keys(policy.targetCounts),
       ...policy.actions.map((action) => action.id).filter(Boolean),
+      ...Object.keys(policy.deployIntervals ?? {}),
+      ...(policy.phases ?? []).flatMap((phase) => [...Object.keys(phase.targetCounts ?? {}), ...Object.keys(phase.deployIntervals ?? {}),
+        ...(phase.priority ?? []), ...(phase.fallbackPriority ?? [])]),
     ]);
     const missingFromBattle = [...referenced].filter((id) => !actualIds.has(id));
     if (missingFromBattle.length) {
@@ -2808,13 +2893,15 @@
     speedRestoreToken++;
     executor = {
       strategy,
-      policy: strategy.policy,
+      policy: { ...strategy.policy },
       context: null,
       expectedStageId: Number(strategy.stageId),
       waitingForBattle: true,
       waitStartedAt: performance.now(),
       actionIndex: 0,
       sequenceIndex: 0,
+      phaseIndex: 0,
+      lastDeployAt: {},
       opened: new Set(),
       nextActionAt: 0,
       lastStatus: "",
@@ -2850,12 +2937,14 @@
     const speedChoice = parseSpeedChoice(ui.runSpeed.value);
     executor = {
       strategy,
-      policy: strategy.policy,
+      policy: { ...strategy.policy },
       context: runtime.context,
       expectedStageId: Number(strategy.stageId),
       waitingForBattle: false,
       actionIndex: 0,
       sequenceIndex: 0,
+      phaseIndex: 0,
+      lastDeployAt: {},
       opened: new Set(),
       nextActionAt: 0,
       lastStatus: "",
@@ -3078,6 +3167,7 @@
         executor.staleSince = performance.now();
       }
       if (performance.now() - executor.staleSince > 1500) return;
+      applyPolicyPhases(executor, snapshot.time);
       const speedMode = parseSpeedChoice(ui.runSpeed.value);
       const speedState = manageExecutionSpeed(snapshot, runtime.context, speedMode);
       if (speedState?.busy) {
@@ -3106,6 +3196,7 @@
   }
 
   function decideAndAct(snapshot, context) {
+    applyPolicyPhases(executor, snapshot.time);
     const policy = executor.policy;
     while (executor.actionIndex < policy.actions.length && policy.actions[executor.actionIndex].at <= snapshot.time) {
       const action = policy.actions[executor.actionIndex];
@@ -3229,6 +3320,7 @@
     return false;
   }
 
+  // testable:tryDeploy
   function tryDeploy(id, snapshot, context) {
     const slot = context.team.findIndex((entry) => entry.id === id);
     if (slot < 0) throw new Error(`当前队伍没有 ${id}`);
@@ -3236,8 +3328,16 @@
     if (snapshot.cats >= 20) return false;
     if ((snapshot.cooldowns?.[slot] ?? 0) > 0) return false;
     if (snapshot.money < entry.cost) return false;
-    return pressDeployKey(slot, context);
+    const last = executor.lastDeployAt?.[id], interval = executor.policy.deployIntervals?.[id] ?? 0;
+    if (last != null && snapshot.time + 1e-9 < last + interval) return false;
+    const outcome = pressDeployKey(slot, context);
+    if (outcome === true) {
+      executor.lastDeployAt ??= {};
+      executor.lastDeployAt[id] = snapshot.time;
+    }
+    return outcome;
   }
+  // end testable:tryDeploy
 
   function clickCardForId(id, context) {
     const slot = context.team.findIndex((entry) => entry.id === id);
@@ -3382,6 +3482,9 @@
       break;
     }
 
+    const nextPhase = (policy.phases ?? [])[executor.phaseIndex ?? 0];
+    if (nextPhase) add(nextPhase.at, "策略阶段");
+
     if (!policy.automatic) return earliestCandidate(candidates);
 
     const money = Number(snapshot.money ?? 0);
@@ -3403,7 +3506,9 @@
       if (Number(snapshot.cats ?? 0) >= 20) return now;
       const entry = team[slot];
       const cooldown = Math.max(0, Number(cooldowns[slot] ?? 0)) * Math.max(0, Number(entry.cooldown ?? 0));
-      return Math.max(now + cooldown, affordAt(entry.cost ?? 0));
+      const last = executor.lastDeployAt?.[id];
+      const intervalAt = last == null ? now : last + (policy.deployIntervals?.[id] ?? 0);
+      return Math.max(now + cooldown, affordAt(entry.cost ?? 0), intervalAt);
     };
 
     if (snapshot.walletLevel < policy.walletTarget) {

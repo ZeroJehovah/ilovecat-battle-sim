@@ -2,7 +2,7 @@
 
 ## Files
 
-- `data/snapshot.json`: captured catalog, current endless stage, and non-sensitive capture metadata.
+- `data/snapshot.json`: captured catalog, current endless stage, and non-sensitive capture metadata. The 2026-11-16 export updates the catalog and heatwave endless season; its 40 fixed campaign stages retain their 2026-11-13 capture. `captureCoverage` records these separate dates.
 - `examples/endless-current.json`: one scenario object.
 - `examples/endless-compare.json`: an array of scenario objects for `compare`.
 
@@ -78,6 +78,32 @@ The action loop runs before each 0.02-second battle step and performs at most on
 - `fallbackAfter`: battle time in seconds after which unused field slots can be filled by replacement units.
 - `fallbackPriority`: order used for replacement units. They are deployed only when no target cat can currently be deployed or when targets are already full.
 - `automatic`: set false to use only `actions`.
+- `deployIntervals`: optional map from cat id to a non-negative minimum number of seconds between successful deployments. For example `{ "s1": 40.22, "a5": 20.12 }` can deliberately stagger a formation. It only delays deployments; native game cooldowns, money and the field cap still apply. Intervals use the observed clock and all cat ids must belong to `team`. Scheduled deployments follow this gate too.
+
+Deployment checks with an observation delay use the observed money, field cap and cooldown before asking the live engine to deploy. The live engine also checks that the action is still possible. A cooldown that has just expired, or income that has just arrived, is unavailable until it appears in the delayed view. Scheduled actions follow the same observation checks. This fixes the earlier automatic deployment path that could act on live money and cooldown ahead of the configured view.
+
+## Policy phases
+
+`policy.phases` is an optional array of time-based overrides. Each `at` is a finite, non-negative battle-clock time, strictly increasing. A phase applies as soon as its time appears in the controller's observed view, independently of the action throttle. Skipping across several phases applies all of them in order. Every battle starts from the original policy and phase index zero.
+
+```json
+{
+  "phases": [
+    { "at": 43, "walletTarget": 5 },
+    {
+      "at": 735,
+      "targetCounts": { "s1": 16, "s2": 2 },
+      "priority": ["s1", "s2"],
+      "fallbackAfter": 735,
+      "fallbackPriority": ["c2", "c3", "c6"]
+    }
+  ]
+}
+```
+
+Allowed overrides are `walletTarget`, `economyFirst`, `automatic`, `targetCounts`, `priority`, `fallbackAfter`, `fallbackPriority`, `autoCannon`, `autoCannonAfter`, `autoCannonMinTargets`, the browser's `autoCannonFallbackAfter`, and `deployIntervals`. Other fields are rejected. Arrays, `targetCounts`, and `deployIntervals` replace the previous values completely; omitted fields retain their previous values. A cat omitted from a new target map has no permanent target, and a cat omitted from a new interval map has no added interval. Existing units remain on the field. Interval changes measure from the previous successful deployment; they do not reset its timestamp. The opening sequence, scheduled action cursor, action gap and observation delay continue unchanged. Every cat referenced in any future phase must belong to `team`, and browser preparation and live validation cover all future references.
+
+Executable phase or interval strategies use `format: "ilovecat-battle-strategy", version: 2` and require userscript `0.9.0-SNAPSHOT` or later. The new executor also accepts version 1 without either feature. Older executors reject version 2, preventing a strategy from silently running without its timing controls. Offline scenario files do not require an executable format/version field. Neither feature changes combat attributes, game cooldowns or the fixed 0.02-second battle step.
 
 ## Scheduled actions
 

@@ -11,7 +11,7 @@ const stage1 = snapshot.catalog.stages.find((stage) => stage.id === 1);
 const mouse = (id) => snapshot.catalog.mice.find((entry) => entry.id === id);
 
 function bareStage(base = stage1) {
-  return { ...base, waves: [], scale: 1 };
+  return { ...base, waves: [], scale: 1, modifier: null };
 }
 
 function engineFor(team, stage = bareStage(), options = {}) {
@@ -27,12 +27,12 @@ function engineFor(team, stage = bareStage(), options = {}) {
 }
 
 test("snapshot contains the current catalog and endless wave data", () => {
-  assert.equal(snapshot.catalog.cats.length, 32);
+  assert.equal(snapshot.catalog.cats.length, 33);
   assert.equal(snapshot.catalog.mice.length, 56);
   assert.equal(snapshot.catalog.stages.length, 40);
   assert.equal(snapshot.stage.id, 9101);
-  assert.equal(snapshot.stage.modifier, "moon");
-  assert.equal(snapshot.endlessMeta.season, "2026-11-09");
+  assert.equal(snapshot.stage.modifier, "heatwave");
+  assert.equal(snapshot.endlessMeta.season, "2026-11-16");
   assert.equal(snapshot.stage.time_limit, 900);
   assert.equal(snapshot.stage.waves.length, 84);
 
@@ -529,6 +529,55 @@ test("observationDelay models the executor's 10 Hz view", () => {
   assert.ok(delayed.actionLog[0].at >= 0.15 - 1e-9);
 });
 
+test("delayed deployments wait for observed income and observed cooldown expiry", () => {
+  const base = {
+    snapshot: { ...snapshot, catalog: { ...snapshot.catalog, rules: { ...snapshot.catalog.rules, start_coins: 0 } } },
+    stage: { ...bareStage(snapshot.stage), time_limit: 10 },
+    team: [{ id: "c1", level: 1 }], maxTime: 5, recordActions: true,
+    policy: { walletTarget: 1, priority: ["c1"], targetCounts: { c1: 2 } },
+  };
+  const immediate = simulate(base).actionLog.filter((a) => a.type === "deploy");
+  const delayed = simulate({ ...base, policy: { ...base.policy, observationDelay: 0.1 } })
+    .actionLog.filter((a) => a.type === "deploy");
+  assert.equal(immediate.length, 2);
+  assert.equal(delayed.length, 2);
+  assert.ok(delayed[0].at - immediate[0].at >= 0.1 - 1e-9, "income must first appear in the observed view");
+  assert.ok(delayed[1].at - delayed[0].at >= 2.6 - 1e-9, "observed cooldown lasts another delay after live expiry");
+});
+
+test("policy phases switch targets on the observed clock and retain existing units", () => {
+  const phases = [
+    { at: 1, automatic: true, targetCounts: { c1: 1 }, priority: ["c1"] },
+    { at: 2, targetCounts: { c1: 0, c6: 1 }, priority: ["c6"] },
+  ];
+  const base = { snapshot, stage: { ...bareStage(snapshot.stage), time_limit: 10 },
+    team: [{ id: "c1", level: 1 }, { id: "c6", level: 1 }], maxTime: 5, recordActions: true,
+    policy: { walletTarget: 1, automatic: false, observationDelay: 0.1, phases } };
+  const run = simulate(base);
+  assert.deepEqual(run.actionLog.map(({ at, id }) => ({ at, id })), [{ at: 1.1, id: "c1" }, { at: 2.1, id: "c6" }]);
+  assert.equal(run.field.c1, 1);
+  assert.equal(run.field.c6, 1);
+  assert.deepEqual(simulate(base).actionLog, run.actionLog, "phase state must reset for every battle");
+  assert.equal(phases[0].targetCounts.c1, 1, "input policy must remain reusable");
+  const team = base.team;
+  for (const invalid of [
+    [{ at: -1 }], [{ at: 2 }, { at: 1 }], [{ at: 1 }, { at: 1 }],
+    [{ at: 1, priority: ["s1"] }], [{ at: 1, targetCounts: { c1: -1 } }],
+    [{ at: 1, actionGap: 0 }], [{ at: 1, walletTarget: 9 }], [{ at: 1, automatic: "true" }],
+  ]) assert.throws(() => new AutoPolicy(team, { phases: invalid }));
+});
+
+test("deployment intervals preserve game cooldowns and apply phase overrides from the last deployment", () => {
+  const run = simulate({ snapshot, stage: { ...bareStage(), time_limit: 12 },
+    team: [{ id: "c1", level: 1 }], maxTime: 9, recordActions: true,
+    policy: { walletTarget: 1, targetCounts: { c1: 3 }, priority: ["c1"],
+      deployIntervals: { c1: 3.5 }, phases: [{ at: 4, deployIntervals: { c1: 5 } }] } });
+  assert.deepEqual(run.actionLog.map((a) => a.at), [0, 3.5, 8.5]);
+  for (const invalid of [{ c1: -1 }, { c1: Infinity }, [], { s1: 1 }]) {
+    assert.throws(() => new AutoPolicy([{ id: "c1", level: 1 }], { deployIntervals: invalid }));
+  }
+});
+
 test("world-boss runs report direct boss damage and aggregate its distribution", () => {
   const worldBoss = {
     id: 9001,
@@ -595,7 +644,7 @@ test("a recorded action log replays exactly", () => {
   assert.equal(replay.result, first.result);
 });
 
-test("the bundled endless example reproduces the expected late-round survival band", async () => {
+test("the historical bundled example retains its original moon survival band", async () => {
   const scenario = JSON.parse(
     await readFile(new URL("../examples/endless-current.json", import.meta.url), "utf8"),
   );
@@ -604,6 +653,7 @@ test("the bundled endless example reproduces the expected late-round survival ba
     team: scenario.team,
     policy: scenario.policy,
     stageId: scenario.stageId,
+    stage: { ...snapshot.stage, modifier: "moon" },
     items: scenario.items,
     maxTime: scenario.maxTime,
     seed: 1,

@@ -1,4 +1,4 @@
-import { BattleEngine, STEP } from "./engine.mjs";
+import { BattleEngine, STEP, MAX_FIELD_CATS } from "./engine.mjs";
 
 function unique(values) {
   return [...new Set(values)];
@@ -31,6 +31,61 @@ export function selectStage(snapshot, stageId = null) {
   const found = snapshot.catalog?.stages?.find((stage) => Number(stage.id) === id);
   if (!found) throw new Error(`stage ${id} is not present in the snapshot`);
   return found;
+}
+
+export function normalizeDeployIntervals(value = {}) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("policy.deployIntervals must be an object");
+  for (const [id, seconds] of Object.entries(value)) {
+    if (!id || !Number.isFinite(seconds) || seconds < 0) throw new Error(`policy.deployIntervals.${id} must be non-negative`);
+  }
+  return { ...value };
+}
+
+export function normalizePolicyPhases(phases = []) {
+  if (!Array.isArray(phases)) throw new Error("policy.phases must be an array");
+  const allowed = new Set(["at", "walletTarget", "economyFirst", "automatic", "targetCounts", "priority",
+    "fallbackAfter", "fallbackPriority", "autoCannon", "autoCannonAfter", "autoCannonMinTargets", "autoCannonFallbackAfter", "deployIntervals"]);
+  let previous = -1;
+  return phases.map((phase, index) => {
+    const label = `policy.phases[${index}]`;
+    if (!phase || typeof phase !== "object" || Array.isArray(phase)) throw new Error(`${label} must be an object`);
+    for (const key of Object.keys(phase)) if (!allowed.has(key)) throw new Error(`${label}.${key} is unsupported`);
+    if (!Number.isFinite(phase.at) || phase.at < 0 || phase.at <= previous) {
+      throw new Error(`${label}.at must be non-negative and strictly increasing`);
+    }
+    previous = phase.at;
+    const normalized = { ...phase };
+    if ("deployIntervals" in phase) normalized.deployIntervals = normalizeDeployIntervals(phase.deployIntervals);
+    for (const key of ["economyFirst", "automatic", "autoCannon"]) {
+      if (key in phase && typeof phase[key] !== "boolean") throw new Error(`${label}.${key} must be a boolean`);
+    }
+    if ("walletTarget" in phase && (!Number.isInteger(phase.walletTarget) || phase.walletTarget < 1 || phase.walletTarget > 8)) {
+      throw new Error(`${label}.walletTarget must be an integer from 1 to 8`);
+    }
+    for (const key of ["fallbackAfter", "autoCannonAfter", "autoCannonFallbackAfter"]) {
+      if (key in phase && (!Number.isFinite(phase[key]) || phase[key] < 0)) throw new Error(`${label}.${key} must be non-negative`);
+    }
+    if ("autoCannonMinTargets" in phase && (!Number.isInteger(phase.autoCannonMinTargets) || phase.autoCannonMinTargets < 0)) {
+      throw new Error(`${label}.autoCannonMinTargets must be a non-negative integer`);
+    }
+    for (const key of ["priority", "fallbackPriority"]) {
+      if (!(key in phase)) continue;
+      if (!Array.isArray(phase[key]) || phase[key].some((id) => typeof id !== "string" || !id)) {
+        throw new Error(`${label}.${key} must be an array of cat ids`);
+      }
+      normalized[key] = [...new Set(phase[key])];
+    }
+    if ("targetCounts" in phase) {
+      if (!phase.targetCounts || typeof phase.targetCounts !== "object" || Array.isArray(phase.targetCounts)) {
+        throw new Error(`${label}.targetCounts must be an object`);
+      }
+      for (const [id, count] of Object.entries(phase.targetCounts)) {
+        if (!id || !Number.isInteger(count) || count < 0) throw new Error(`${label}.targetCounts.${id} must be a non-negative integer`);
+      }
+      normalized.targetCounts = { ...phase.targetCounts };
+    }
+    return normalized;
+  });
 }
 
 export class AutoPolicy {
@@ -67,6 +122,10 @@ export class AutoPolicy {
       throw new Error("autoCannonMinTargets must be a non-negative integer");
     }
     this.nextActAt = 0;
+    this.phases = normalizePolicyPhases(options.phases);
+    this.phaseIndex = 0;
+    this.deployIntervals = normalizeDeployIntervals(options.deployIntervals);
+    this.lastDeployAt = {};
 
     if (!Array.isArray(this.deploySequence) || this.deploySequence.some((id) => typeof id !== "string")) {
       throw new Error("deploySequence must be an array of cat ids");
@@ -80,6 +139,9 @@ export class AutoPolicy {
       ...this.deploySequence,
       ...this.fallbackPriority,
       ...this.actions.map((action) => action.id).filter(Boolean),
+      ...Object.keys(this.deployIntervals),
+      ...this.phases.flatMap((phase) => [...Object.keys(phase.targetCounts ?? {}), ...Object.keys(phase.deployIntervals ?? {}),
+        ...(phase.priority ?? []), ...(phase.fallbackPriority ?? [])]),
     ];
     const missing = unique(referenced.filter((id) => !teamIds.has(id)));
     if (missing.length) throw new Error(`policy references cats outside the team: ${missing.join(", ")}`);
@@ -95,8 +157,12 @@ export class AutoPolicy {
   }
 
   deployId(engine, id) {
+    const last = this.lastDeployAt[id], interval = this.deployIntervals[id] ?? 0;
+    if (last != null && engine.time + 1e-9 < last + interval) return false;
     const slot = this.slotFor(engine, id);
-    return slot >= 0 && engine.deploy(slot);
+    if (slot < 0 || !engine.deploy(slot)) return false;
+    this.lastDeployAt[id] = engine.time;
+    return true;
   }
 
   shouldFireCannon(engine) {
@@ -104,6 +170,13 @@ export class AutoPolicy {
       engine.time >= this.autoCannonAfter &&
       engine.cannonCharge >= engine.cannonTime &&
       engine.cannonTargetCount >= this.autoCannonMinTargets;
+  }
+
+  applyPhases(engine) {
+    while (this.phaseIndex < this.phases.length && this.phases[this.phaseIndex].at <= engine.time + 1e-9) {
+      const { at, ...override } = this.phases[this.phaseIndex++];
+      Object.assign(this, override);
+    }
   }
 
   applyScheduled(engine) {
@@ -127,6 +200,7 @@ export class AutoPolicy {
 
   act(engine) {
     if (engine.result !== "playing") return false;
+    this.applyPhases(engine);
     if (this.applyScheduled(engine)) return true;
     if (!this.automatic) return false;
 
@@ -213,9 +287,20 @@ class ObservedEngine {
     return { ...this.state.onField };
   }
 
-  deploy(slot) { return this.engine.deploy(slot); }
-  upgradeWallet() { return this.engine.upgradeWallet(); }
-  fireCannon() { return this.engine.fireCannon(); }
+  deploy(slot) {
+    const cat = this.engine.catById.get(this.team[slot]?.id);
+    if (!cat || this.result !== "playing" || this.catCount >= MAX_FIELD_CATS
+      || this.slotCooldowns[slot] > 0 || this.money < cat.cost) return false;
+    return this.engine.deploy(slot);
+  }
+  upgradeWallet() {
+    if (this.result !== "playing" || this.walletLevel >= 8 || this.money < this.walletCost) return false;
+    return this.engine.upgradeWallet();
+  }
+  fireCannon() {
+    if (this.result !== "playing" || this.cannonCharge < this.cannonTime) return false;
+    return this.engine.fireCannon();
+  }
 }
 
 export function simulate({
@@ -256,6 +341,7 @@ export function simulate({
       while (observations.length > delaySteps + 1) observations.shift();
       view = new ObservedEngine(engine, observations[0]);
     }
+    controller.applyPhases(view);
     if (engine.time + 1e-9 >= controller.nextActAt) {
       if (controller.act(view)) controller.nextActAt = engine.time + controller.actionGap;
     }

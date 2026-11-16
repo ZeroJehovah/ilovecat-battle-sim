@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
-import { selectStage } from "../src/runner.mjs";
+import { selectStage, normalizePolicyPhases as normalizeRunnerPhases } from "../src/runner.mjs";
 
 const source = await readFile(
   new URL("../tools/ilovecat-workbench.user.js", import.meta.url),
@@ -33,8 +33,8 @@ test("the userscript is syntactically valid and exposes both workflows", () => {
   assert.match(source, /@grant\s+GM_unregisterMenuCommand/);
   assert.match(source, /@connect\s+github\.com/);
   assert.match(source, /@connect\s+raw\.githubusercontent\.com/);
-  assert.match(source, /USERSCRIPT_VERSION = "0\.8\.0";/);
-  assert.doesNotMatch(source, /0\.8\.0-SNAPSHOT/);
+  assert.match(source, /USERSCRIPT_VERSION = "0\.9\.0-SNAPSHOT";/);
+  assert.match(source, /@version\s+0\.9\.0-SNAPSHOT/);
   assert.match(source, /isStrategyExpired/);
   assert.match(source, /activeOnlineStrategies/);
   assert.match(source, /scheduleOnlineStrategyExpiry/);
@@ -202,6 +202,75 @@ test("the userscript is syntactically valid and exposes both workflows", () => {
   assert.match(source, /复制所选 JSON/);
   assert.match(source, /下载所选 JSON/);
   assert.doesNotMatch(source, /download-snapshot/);
+});
+
+test("phase policies share validation rules with the runner and require strategy format v2", () => {
+  const normalizeDeployIntervals = markedFunction("normalizeDeployIntervals");
+  const normalizePolicyPhases = markedFunction("normalizePolicyPhases", { normalizeDeployIntervals });
+  const phases = [{ at: 30, walletTarget: 8 }, { at: 735,
+    targetCounts: { a5: 0, c6: 2 }, priority: ["c6"], fallbackAfter: 735,
+    fallbackPriority: ["c1"], automatic: true }];
+  assert.deepEqual(normalizePolicyPhases(phases), normalizeRunnerPhases(phases));
+  for (const invalid of [
+    [{ at: -1 }], [{ at: 2 }, { at: 1 }], [{ at: 1 }, { at: 1 }],
+    [{ at: 1, targetCounts: { c1: -1 } }], [{ at: 1, observationDelay: 0 }],
+    [{ at: 1, priority: "c1" }], [{ at: 1, walletTarget: 9 }],
+  ]) {
+    assert.throws(() => normalizePolicyPhases(invalid));
+    assert.throws(() => normalizeRunnerPhases(invalid));
+  }
+  const parseStrategy = markedFunction("parseStrategyDocument", {
+    STRATEGY_FORMAT: "ilovecat-battle-strategy", normalizePolicyPhases, normalizeDeployIntervals, ACTION_GAP_MS: 250,
+    clampInt: (x) => Number(x), finiteNumber: (x) => Number(x),
+    stringArray: (x) => [...new Set(x)], repeatedStringArray: (x) => [...x],
+  });
+  const strategy = { format: "ilovecat-battle-strategy", version: 2,
+    team: [{ id: "c1", level: 1 }, { id: "c6", level: 1 }, { id: "a5", level: 40 }], policy: { phases } };
+  assert.equal(parseStrategy(JSON.stringify(strategy)).version, 2);
+  assert.throws(() => parseStrategy(JSON.stringify({ ...strategy, version: 1 })), /version=2/);
+  assert.throws(() => parseStrategy(JSON.stringify({ ...strategy, version: 3 })), /version/);
+  assert.throws(() => parseStrategy(JSON.stringify({ ...strategy,
+    policy: { phases: [{ at: 1, priority: ["s1"] }] } })), /不在 team/);
+  assert.equal(parseStrategy(JSON.stringify({ ...strategy, version: 1, policy: {} })).version, 1);
+  assert.throws(() => parseStrategy(JSON.stringify({ ...strategy, version: 1,
+    policy: { deployIntervals: { c1: 5 } } })), /version=2/);
+});
+
+test("browser deployment intervals throttle actual deployments and ignore page switches", () => {
+  const executor = { policy: { deployIntervals: { c1: 5 } }, lastDeployAt: { c1: 1 } };
+  let presses = 0, outcome = true;
+  const tryDeploy = markedFunction("tryDeploy", { executor, pressDeployKey: () => { presses++; return outcome; } });
+  const context = { team: [{ id: "c1", cost: 50 }] };
+  const view = { time: 5.98, cats: 1, cooldowns: [0], money: 500 };
+  assert.equal(tryDeploy("c1", view, context), false);
+  assert.equal(presses, 0);
+  assert.equal(tryDeploy("c1", { ...view, time: 6 }, context), true);
+  assert.equal(executor.lastDeployAt.c1, 6);
+  outcome = "page";
+  assert.equal(tryDeploy("c1", { ...view, time: 11 }, context), "page");
+  assert.equal(executor.lastDeployAt.c1, 6);
+  assert.equal(tryDeploy("c1", { ...view, time: 11, money: 0 }, context), false);
+  assert.equal(tryDeploy("c1", { ...view, time: 11, cats: 20 }, context), false);
+});
+
+test("browser phase transitions replace target maps and reset for a new battle", () => {
+  const applyPolicyPhases = markedFunction("applyPolicyPhases");
+  const original = { targetCounts: { a5: 10 }, priority: ["a5"], phases: [
+    { at: 735, targetCounts: { c6: 2 }, priority: ["c6"] },
+    { at: 850, targetCounts: { c1: 4 }, priority: ["c1"] },
+  ] };
+  const execution = { policy: { ...original }, phaseIndex: 0 };
+  applyPolicyPhases(execution, 734.98);
+  assert.equal(execution.phaseIndex, 0);
+  applyPolicyPhases(execution, 735);
+  assert.deepEqual(execution.policy.targetCounts, { c6: 2 });
+  applyPolicyPhases(execution, 900);
+  assert.equal(execution.phaseIndex, 2);
+  assert.deepEqual(execution.policy.targetCounts, { c1: 4 });
+  assert.deepEqual(original.targetCounts, { a5: 10 });
+  const nextBattle = { policy: { ...original }, phaseIndex: 0 };
+  applyPolicyPhases(nextBattle, 0);
+  assert.deepEqual(nextBattle.policy.targetCounts, { a5: 10 });
 });
 
 test("speed choices map to auto or fixed execution speeds", () => {
