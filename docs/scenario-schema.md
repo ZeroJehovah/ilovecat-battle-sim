@@ -156,7 +156,7 @@ A single run reports:
 
 Batch output adds duration, fortress-damage and boss-damage mean, minimum, P10, median, P90, maximum, plus result counts and round counts. `fullDurationFortressDamage` contains the same damage statistics and `runs` for the subset with `result: "timeup"`; it is `null` when no run reaches the time limit. Table and Markdown output show the full-duration fraction explicitly. A shorter `maxTime` result (`limit`) is not a full-duration success. Compare uses one shared seed range for every candidate.
 
-Endless comparisons report both survival (full-duration fraction and duration distribution) and fortress damage, with survival taking priority. Report the all-run mean first; the full-duration-only mean is conditional and must not replace it. Boss-unit damage is a separate metric and is not enemy fortress damage. No combined scoring formula is assumed.
+Endless comparisons report both the requested survival threshold rate and duration distribution, plus fortress damage. A full-duration rate is useful context but is not a required objective unless the scenario says so. When the target is at least 14 minutes, report the fraction reaching 840 seconds, duration mean and P10/P50/P90, full-duration rate, and all-run fortress-damage mean; report the full-duration-only damage mean separately. State sample size, seed range, and rate uncertainty. Boss-unit damage is separate from fortress damage. No combined scoring formula is assumed.
 
 When aggregating legacy samples without `fortressDamage`, the two fortress-statistic fields are omitted rather than filled with zero. Mixing known and unknown fortress damage is rejected. Legacy fortress loss can be reconstructed only when the original stage's starting HP is known.
 
